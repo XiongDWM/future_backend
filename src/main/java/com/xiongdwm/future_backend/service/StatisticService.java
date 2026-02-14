@@ -11,4 +11,7 @@ public interface StatisticService {
 
     /** 清理超过7天的快照数据 */
     void cleanOldSnapshots();
+
+    /** 获取指定打手的工单汇总（总工单数、总收入） */
+    java.util.Map<String, Object> getUserOrderSummary(Long userId);
 }

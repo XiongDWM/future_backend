@@ -32,6 +32,11 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 
 	@Override
 	public boolean submit(FindingRequest findingRequest) {
+        // 确保 palworld 是受管实体（客户端可能只传了 id）
+        if (findingRequest.getPalworld() != null && findingRequest.getPalworld().getId() != null) {
+            var user = userService.getUserById(findingRequest.getPalworld().getId());
+            findingRequest.setPalworld(user);
+        }
         findingRequest.setRequestedAt(new Date());
         var saved=requestRepository.saveAndFlush(findingRequest);
         eventBus.emit(domain, GlobalEventSpec.Action.CREATE, true,saved.getId());

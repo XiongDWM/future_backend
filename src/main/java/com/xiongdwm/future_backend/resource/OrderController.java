@@ -18,6 +18,7 @@ import com.xiongdwm.future_backend.utils.JacksonUtil;
 import jakarta.annotation.Resource;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 
@@ -89,5 +90,31 @@ public class OrderController {
             return success ? ApiResponse.success("订单已完成") : ApiResponse.<String>error("订单关闭失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
-    
+
+    /** 打手接单开工 */
+    @PostMapping("/order/work")
+    public Mono<ApiResponse<String>> workOrder(@RequestBody Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            long palId = Long.parseLong(body.get("palId"));
+            String orderId = body.get("orderId");
+            String picStart = body.getOrDefault("picStart", "");
+            var success = orderService.workWork(palId, orderId, picStart);
+            return success ? ApiResponse.success("接单成功") : ApiResponse.<String>error("接单失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 续单 */
+    @PostMapping("/order/continue")
+    public Mono<ApiResponse<String>> continueOrder(@RequestBody Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            String orderId = body.get("orderId");
+            double price = Double.parseDouble(body.getOrDefault("price", "0"));
+            double amount = Double.parseDouble(body.getOrDefault("amount", "0"));
+            var unitType = com.xiongdwm.future_backend.entity.Order.UnitType.valueOf(
+                    body.getOrDefault("unitType", "HOUR"));
+            String additionalPic = body.get("additionalPic");
+            var success = orderService.continueOrder(orderId, price, amount, unitType, additionalPic);
+            return success ? ApiResponse.success("续单成功") : ApiResponse.<String>error("续单失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
 }

@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.xiongdwm.future_backend.bo.OnlineCountStatistic;
 import com.xiongdwm.future_backend.bo.OnlineCountStatistic.SnapshotPoint;
 import com.xiongdwm.future_backend.entity.PalOnlineSnapshot;
+import com.xiongdwm.future_backend.repository.OrderRepository;
 import com.xiongdwm.future_backend.repository.PalOnlineSnapshotRepository;
+import com.xiongdwm.future_backend.service.OrderSectionService;
 import com.xiongdwm.future_backend.service.StatisticService;
 import com.xiongdwm.future_backend.service.UserService;
 
@@ -28,6 +30,10 @@ public class StatisticServiceImpl implements StatisticService {
     private UserService userService;
     @Resource
     private PalOnlineSnapshotRepository snapshotRepository;
+    @Resource
+    private OrderRepository orderRepository;
+    @Resource
+    private OrderSectionService sectionService;
 
     @Override
     public OnlineCountStatistic getOnlineCountStatistic() {
@@ -138,5 +144,21 @@ public class StatisticServiceImpl implements StatisticService {
     private double calcChangePercent(int current, int previous) {
         if (previous == 0) return current > 0 ? 100.0 : 0.0;
         return Math.round((current - previous) * 1000.0 / previous) / 10.0;
+    }
+
+    @Override
+    public java.util.Map<String, Object> getUserOrderSummary(Long userId) {
+        var orders = orderRepository.findAll(
+            (root, query, cb) -> cb.equal(root.get("userId"), userId)
+        );
+        int totalOrders = orders.size();
+        double totalIncome = 0;
+        for (var order : orders) {
+            var sections = sectionService.findByOrderId(order.getOrderId());
+            totalIncome += sections.stream()
+                .mapToDouble(com.xiongdwm.future_backend.entity.OrderSection::getPrice)
+                .sum();
+        }
+        return java.util.Map.of("totalOrders", totalOrders, "totalIncome", totalIncome);
     }
 }

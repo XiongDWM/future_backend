@@ -66,4 +66,22 @@ public class UserOperationController {
             return success ? ApiResponse.success("注册成功") : ApiResponse.<String>error("注册失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
+
+    /** 打手状态变更（ACTIVE / HANGING / OFFLINE） */
+    @PostMapping("/user/status")
+    public Mono<ApiResponse<String>> changeStatus(@RequestBody java.util.Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            Long userId = Long.valueOf(body.get("userId"));
+            String statusStr = body.get("status");
+            var user = userService.getUserById(userId);
+            if (user == null) return ApiResponse.<String>error("用户不存在");
+            var status = User.Status.valueOf(statusStr);
+            if (status == User.Status.OFFLINE) {
+                user.setLastLogout(new java.util.Date());
+            }
+            user.setStatus(status);
+            var success = userService.updateUser(user);
+            return success ? ApiResponse.success("状态已更新") : ApiResponse.<String>error("更新失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
 }

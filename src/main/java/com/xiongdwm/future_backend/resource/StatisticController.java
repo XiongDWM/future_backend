@@ -1,6 +1,9 @@
 package com.xiongdwm.future_backend.resource;
 
+import java.util.Map;
+
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xiongdwm.future_backend.bo.ApiResponse;
@@ -23,6 +26,15 @@ public class StatisticController {
         return Mono.fromCallable(() -> {
             var stat = statisticService.getOnlineCountStatistic();
             return ApiResponse.success(stat);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 打手个人工单汇总：总工单数、总收入 */
+    @GetMapping("/statistic/user-summary")
+    public Mono<ApiResponse<Map<String, Object>>> userOrderSummary(@RequestParam Long userId) {
+        return Mono.fromCallable(() -> {
+            var summary = statisticService.getUserOrderSummary(userId);
+            return ApiResponse.success(summary);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 }

@@ -54,9 +54,10 @@ public class GlobalWebFilter implements WebFilter {
             "/oss/preview/"
     );
 
-    /** 仅校验 session + 签名，不做 body 加解密（SSE 等流式接口） */
+    /** 仅校验 session + 签名，不做 body 加解密（SSE 等流式接口、文件上传） */
     private static final Set<String> SESSION_ONLY_PATHS = Set.of(
-            "/events/stream"
+            "/events/stream",
+            "/oss/upload"
     );
 
     @Autowired
