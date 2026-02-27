@@ -13,6 +13,7 @@ import com.xiongdwm.future_backend.repository.FindingRequestRepository;
 import com.xiongdwm.future_backend.service.FindingRequestService;
 import com.xiongdwm.future_backend.service.OrderService;
 import com.xiongdwm.future_backend.service.UserService;
+import com.xiongdwm.future_backend.utils.exception.ServiceException;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventBus;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 import com.xiongdwm.future_backend.entity.User;
@@ -39,6 +40,7 @@ public class FindingRequestServiceImpl implements FindingRequestService {
         //     findingRequest.setPalworld(user);
         // }
         findingRequest.setRequestedAt(new Date());
+        findingRequest.setFulfilled(false);
         var saved=requestRepository.saveAndFlush(findingRequest);
         var userId=findingRequest.getPalworld()!=null?findingRequest.getPalworld().getId():null;
         if(null==userId)throw new RuntimeException("找单请求必须关联一个打手");
@@ -51,10 +53,13 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 
 	@Override
 	public boolean confirm(FindingRequestFillDto findingRequestDto) {
-        var order=orderService.createOrderFromFindingRequest(findingRequestDto);
-        if(null==order)throw new RuntimeException("创建订单失败");
         var request=requestRepository.findById(findingRequestDto.getRequestId()).orElse(null);
-        if(request==null)throw new RuntimeException("找单请求不存在");
+        if(request==null)throw new ServiceException("找单请求不存在");
+        if(request.isFulfilled()==null)throw new ServiceException("找单请求已被取消");
+        if(request.isFulfilled())throw new ServiceException("找单请求已完成");
+        var order=orderService.createOrderFromFindingRequest(findingRequestDto);
+        if(null==order)throw new ServiceException("创建订单失败");
+
         request.setFulfilled(true);
         request.setFulfilledAt(new Date());
         request.setOrder(order);
@@ -74,10 +79,10 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 	@Override
 	public boolean cancel(Long requestId) {
 		var request = requestRepository.findById(requestId).orElse(null);
-		if (request == null) throw new RuntimeException("找单请求不存在");
+		if (request == null) throw new ServiceException("找单请求不存在");
 		request.setFulfilled(null);
 		requestRepository.saveAndFlush(request);
-		eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true, request.getId());
+		eventBus.emit(domain, GlobalEventSpec.Action.CANCEL, true, request.getId());
 		return true;
 	}
     
