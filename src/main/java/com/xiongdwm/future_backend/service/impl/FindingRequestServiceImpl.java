@@ -4,7 +4,6 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.xiongdwm.future_backend.bo.FindingRequestFillDto;
@@ -70,10 +69,11 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 
 	@Override
 	public List<FindingRequest> getRequests(User user) {
+        var since = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000);
         if (user != null) {
-            return requestRepository.findByPalworldOrderByRequestedAtDesc(user);
+            return requestRepository.findByPalworldAndRequestedAtAfterOrderByRequestedAtDesc(user, since);
         }
-        return requestRepository.findAll(Sort.by(Sort.Direction.DESC, "requestedAt"));
+        return requestRepository.findByRequestedAtAfterOrderByRequestedAtDesc(since);
 	}
 
 	@Override
