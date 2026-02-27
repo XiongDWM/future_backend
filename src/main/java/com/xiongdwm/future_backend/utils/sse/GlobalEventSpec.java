@@ -30,6 +30,7 @@ public record GlobalEventSpec(
 
     public enum Action{
         SNAPSHOT("快照",false),
+        CANCEL("撤销", true),
         CREATE("创建", true),
         UPDATE("更新", true),
         DELETE("删除", true);

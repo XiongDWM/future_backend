@@ -55,8 +55,6 @@ public class BookOrderController {
             Long pid = filters != null && filters.containsKey("pid") && !filters.get("pid").isBlank()
                     ? Long.valueOf(filters.get("pid"))
                     : null;
-
-            // 如果当前用户是打手，强制只查自己的存单
             var user = tokenProvider.getUserFromRawToken(token);
             if (user != null && user.getRole() == User.Role.PALWORLD) {
                 pid = user.getId();
