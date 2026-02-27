@@ -29,7 +29,6 @@ public class AuthenticationController {
     public Mono<ApiResponse<String>> login(@RequestBody Map<String, String> body) {
         String username = body.get("username").trim();
         String password = body.get("password");
-        System.out.println("========login api called=========");
         return Mono.fromCallable(() -> {
             var user = authenticationService.authenticate(username, password);
             String token = jwtTokenProvider.generateToken(
@@ -54,8 +53,11 @@ public class AuthenticationController {
     @PostMapping("/user/logout")
     public Mono<ApiResponse<String>> logout(@RequestHeader(name="Authorization", required=true) String token) {
         var userId = jwtTokenProvider.getUserId(token);
-        boolean s=authenticationService.logout(Long.parseLong(userId));
-        activityTracker.remove(Long.parseLong(userId));
-        return Mono.just(ApiResponse.success("Logged out successfully"));
+        return Mono.fromCallable(() -> {
+            boolean success = authenticationService.logout(Long.parseLong(userId));
+            if(!success) return ApiResponse.error("Logout failed");
+            activityTracker.remove(Long.parseLong(userId));
+            return ApiResponse.success("Logged out successfully");
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 }
