@@ -8,8 +8,11 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -33,11 +36,13 @@ public class OrderSection {
     @Column
     private boolean finished=false; // 是否完成
     @Column
+    @Enumerated(EnumType.STRING)
     private Order.UnitType unitType;
 
 
     @ManyToOne(fetch = FetchType.LAZY, targetEntity = Order.class)
-    @JsonManagedReference
+    @JoinColumn(name = "parent_id", referencedColumnName = "orderId")
+    @JsonManagedReference("order-sections")
     private Order order;
 
 

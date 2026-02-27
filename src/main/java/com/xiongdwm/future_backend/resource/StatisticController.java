@@ -31,7 +31,7 @@ public class StatisticController {
 
     /** 打手个人工单汇总：总工单数、总收入 */
     @GetMapping("/statistic/user-summary")
-    public Mono<ApiResponse<Map<String, Object>>> userOrderSummary(@RequestParam Long userId) {
+    public Mono<ApiResponse<Map<String, Object>>> userOrderSummary(@RequestParam("userId") Long userId) {
         return Mono.fromCallable(() -> {
             var summary = statisticService.getUserOrderSummary(userId);
             return ApiResponse.success(summary);

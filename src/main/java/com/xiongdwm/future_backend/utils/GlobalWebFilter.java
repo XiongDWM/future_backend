@@ -7,6 +7,7 @@ import javax.crypto.SecretKey;
 
 import org.reactivestreams.Publisher;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
@@ -62,9 +63,14 @@ public class GlobalWebFilter implements WebFilter {
 
     @Autowired
     private CacheHandler cacheHandler;
+    @Value("${project.dev:false}")
+    private boolean devMode;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        if (devMode) {
+            return chain.filter(exchange);
+        }
         String path = exchange.getRequest().getPath().value();
 
         // 握手接口完全放行

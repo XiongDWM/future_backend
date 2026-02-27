@@ -1,13 +1,14 @@
 package com.xiongdwm.future_backend.entity;
 
 import java.util.Date;
-
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -18,13 +19,27 @@ public class BookOrder {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     private Long id;
-    private String customer;
+    @Column
+    private String customer; // 客户备注
+    @Column
+    private String customerId; // 客户id 微信号
+    @Column
     private Date createTime;
-    private String details; // 订单描述
+    @Column
+    private String details; // 客户描述
+    @Column
     private double amount; // 存单数量
+    @Column
     private double price; // 存单单价价格
+    @Column
+    private String picProvence; // 订单相关的图片证明来源，纯文本（oss上传获取的文件ID），由前端传入，后端不做解析
+    @Column
+    private Long pid; // 打手id 冗余 repository查询用
+    @Column
+    private double remaining=0d; // 剩余数量，初始值等于amount，订单完成后会变成0，订单部分完成会小于amount但大于0
     @ManyToOne(fetch = FetchType.LAZY)
-    @JsonManagedReference
+    @JoinColumn(name = "palworld_id", referencedColumnName = "id")
+    @JsonManagedReference("user-book-orders")
     private User palworld; // 关联打手
     
     public Long getId() {
@@ -69,7 +84,28 @@ public class BookOrder {
     public void setPalworld(User palworld) {
         this.palworld = palworld;
     }
-    
-    
-    
+    public String getCustomerId() {
+        return customerId;
+    }
+    public void setCustomerId(String customerId) {
+        this.customerId = customerId;
+    }
+    public Long getPid() {
+        return pid;
+    }
+    public void setPid(Long pid) {
+        this.pid = pid;
+    }
+    public String getPicProvence() {
+        return picProvence;
+    }
+    public void setPicProvence(String picProvence) {
+        this.picProvence = picProvence;
+    }
+    public double getRemaining() {
+        return remaining;
+    }
+    public void setRemaining(double remaining) {
+        this.remaining = remaining;
+    }
 }

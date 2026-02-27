@@ -6,7 +6,6 @@ import java.util.Date;
 import com.xiongdwm.future_backend.entity.Order;
 import com.xiongdwm.future_backend.entity.Order.UnitType;
 
-// 完成找单请求时所需填写的信息
 public class FindingRequestFillDto implements Serializable {
     private Long requestId; // 请求单信息带出的找单请求id
 	private Long palId; // 请求单信息带出打手id
@@ -15,8 +14,9 @@ public class FindingRequestFillDto implements Serializable {
     private String customer; // 玩家账号
     private String resource; // 来源
     private double lowIncome; // 最低收入
-    private double amount; 
+    private double amount; // 数量
     private UnitType unitType;
+	private String description; // 描述，存游戏类型和段位，格式是 "gameType|rank"
 
 	public Long getRequestId() {
 		return requestId;
@@ -73,5 +73,10 @@ public class FindingRequestFillDto implements Serializable {
 		this.palId = palId;
 	}
 
-    
+	public String getDescription() {
+		return description;
+	}
+	public void setDescription(String description) {
+		this.description = description;
+	}
 }

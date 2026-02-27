@@ -9,10 +9,14 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import com.xiongdwm.future_backend.entity.FindingRequest;
+import com.xiongdwm.future_backend.entity.User;
 
 @Repository
 public interface FindingRequestRepository extends JpaRepository<FindingRequest, Long>, JpaSpecificationExecutor<FindingRequest> {
     @Override
     @EntityGraph(attributePaths = {"palworld", "order"})
     List<FindingRequest> findAll(Sort sort);
+
+    @EntityGraph(attributePaths = {"palworld", "order"})
+    List<FindingRequest> findByPalworldOrderByRequestedAtDesc(User palworld);
 }

@@ -35,7 +35,7 @@ public class OssController {
     }
 
     @GetMapping("/download/{fileId}")
-    public Flux<DataBuffer> download(@PathVariable String fileId,
+    public Flux<DataBuffer> download(@PathVariable("fileId") String fileId,
                                      org.springframework.http.server.reactive.ServerHttpResponse response) {
         String filename = fileLogService.getDownloadFilename(fileId);
         response.getHeaders().set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
@@ -44,9 +44,10 @@ public class OssController {
     }
 
     @GetMapping("/preview/{fileId}")
-    public Flux<DataBuffer> preview(@PathVariable String fileId,
+    public Flux<DataBuffer> preview(@PathVariable("fileId") String fileId,
                                     org.springframework.http.server.reactive.ServerHttpResponse response) {
         String subfix = fileLogService.getFileSubfix(fileId);
+        System.out.println("Previewing file " + fileId + " with subfix " + subfix);
         MediaType mediaType = switch (subfix.toLowerCase()) {
             case ".png"  -> MediaType.IMAGE_PNG;
             case ".jpg", ".jpeg" -> MediaType.IMAGE_JPEG;
@@ -62,7 +63,7 @@ public class OssController {
     }
 
     @DeleteMapping("/delete/{fileId}")
-    public Mono<ApiResponse<Boolean>> delete(@PathVariable String fileId) {
+    public Mono<ApiResponse<Boolean>> delete(@PathVariable("fileId") String fileId) {
         return fileLogService.delete(fileId)
                 .map(ApiResponse::success);
     }

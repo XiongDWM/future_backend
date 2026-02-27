@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.annotation.Nullable;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
@@ -62,23 +63,27 @@ public class Order {
     @Column
     @Nullable
     private String additionalPic; // 二手单的附加截图
+    @Column
+    private String gameType; // 订单相关的游戏类型，由前端传入，后端不做解析, 条件查询用
+    @Column
+    private String rankInfo;  // 订单相关的游戏段位等信息，纯文本，由前端传入，后端不做解析, 条件查询用
 
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    @JsonManagedReference
+    @JoinColumn(name = "palworld_id", referencedColumnName = "id")
+    @JsonManagedReference("user-orders")
     private User palworld; // 打手
 
-    @OneToMany(mappedBy = "order", targetEntity = OrderSection.class)
+    @OneToMany(mappedBy = "order", targetEntity = OrderSection.class, cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonBackReference
     private List<OrderSection> orderSections;
 
     public enum Type {
         SELF_B("自接男单", true),
         SELF_G("自接女单/Ai", true),
-        BOOKED("预约单", true), // 打手自己的预约单，从打手端发起
-        COMPELETING("预约单补单", true), // 预约单的补单，从用户端发起
-        SECOND_HAND("二手单", true),
+        BOOKED("存单", true), // 打手自己的预约单，从打手端发起
+        SECOND_HAND("二手男单", true),
+        SECOND_HAND_G("二手女单/Ai", true),
         THIRD_PARTY("甩单", false),
         LONG_TERM("长时间订单", true); 
 
@@ -97,7 +102,7 @@ public class Order {
     }
 
     public enum SecondHandStatus{
-        THIRD_PARTY_TAKEN_PROCESS_DONE("二手单完成（图片已经上传）"), 
+        THIRD_PARTY_TAKEN_PROCESS_DONE("二手单接单完成（图片已经上传）"), 
         THIRD_PARTY_SETTLEMENT_PULL("二手单等待结算"),
         THIRD_PARTY_SETTLED("二手单完成（上传结算截图）");
         private final String statusText;
@@ -114,9 +119,6 @@ public class Order {
         IN_PROGRESS("进行中"),  
         THIRD_PARTY_WAITING("甩单待接单"),
         THIRD_PARTY_TAKEN("甩单被接单"),
-        THIRD_PARTY_TAKEN_PROCESS_DONE("二手单完成（图片已经上传）"), 
-        THIRD_PARTY_SETTLEMENT_PULL("二手单等待结算"),
-        THIRD_PARTY_SETTLED("二手单完成（上传结算截图）"),
         COMPLETED("已完成"),
         CANCELLED("已取消");
 
@@ -262,6 +264,24 @@ public class Order {
     }
     public void setSecondHandStatus(SecondHandStatus secondHandStatus) {
         this.secondHandStatus = secondHandStatus;
+    }
+    public String getGameType() {
+        return gameType;
+    }
+    public void setGameType(String gameType) {
+        this.gameType = gameType;
+    }
+    public String getRankInfo() {
+        return rankInfo;
+    }
+    public void setRankInfo(String rankInfo) {
+        this.rankInfo = rankInfo;
+    }
+        
+    @Override
+    public String toString() {
+        return "Order [orderId=" + orderId + ", issueDate=" + issueDate + ", status=" + status + ", lowIncome="
+                + lowIncome + ", amount=" + amount + ", secondHandStatus=" + secondHandStatus + "]";
     }
     
 }

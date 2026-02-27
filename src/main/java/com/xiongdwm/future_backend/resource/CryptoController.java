@@ -38,7 +38,7 @@ public class CryptoController {
     @PostMapping("/crypto/handshake")
     public ApiResponse<String> handshake(ServerWebExchange exchange) {
         String clientKeyBase64 = exchange.getRequest().getHeaders().getFirst("X-Client-Key");
-        System.out.println("收到握手请求，客户端公钥: " + clientKeyBase64);
+        System.out.println("收到握手请求");
         if (clientKeyBase64 == null || clientKeyBase64.isBlank()) {
             return ApiResponse.bussiness_error("something went wrong");
         }

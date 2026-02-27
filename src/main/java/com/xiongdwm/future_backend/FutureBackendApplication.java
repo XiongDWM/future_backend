@@ -8,6 +8,8 @@ public class FutureBackendApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(FutureBackendApplication.class, args);
+
+		// todo 后端更新， 打手端更新，
 	}
 
 }

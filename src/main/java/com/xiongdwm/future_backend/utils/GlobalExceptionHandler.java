@@ -18,7 +18,7 @@ public class GlobalExceptionHandler {
 
         @ExceptionHandler(ServiceException.class)
     public ApiResponse<String> handleServiceException(ServiceException e) {
-        logger.error("Service Exception: ", e.getLocalizedMessage());
+        logger.error("Service Exception: ", e.getMessage(), e);
         return ApiResponse.bussiness_error(e.getLocalizedMessage());
     }
 

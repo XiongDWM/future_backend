@@ -1,6 +1,7 @@
 package com.xiongdwm.future_backend.resource;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.xiongdwm.future_backend.bo.ApiResponse;
 import com.xiongdwm.future_backend.bo.PageableParam;
+import com.xiongdwm.future_backend.bo.RegisterRequest;
 import com.xiongdwm.future_backend.entity.User;
 import com.xiongdwm.future_backend.service.UserService;
 
@@ -58,18 +60,23 @@ public class UserOperationController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    /** 注册新用户 */
     @PostMapping("/user/register")
-    public Mono<ApiResponse<String>> register(@RequestBody User user) {
+    public Mono<ApiResponse<String>> register(@RequestBody RegisterRequest user) {
+        var userEntity =new User();
+        userEntity.setUsername(user.getUsername());
+        userEntity.setPassword(user.getPassword());
+        userEntity.setRole(user.getRole());
+        userEntity.setIdentity(user.getIdentity());
+        userEntity.setRealName(user.getRealName());
         return Mono.fromCallable(() -> {
-            var success = userService.regist(user);
+            var success = userService.regist(userEntity);
             return success ? ApiResponse.success("注册成功") : ApiResponse.<String>error("注册失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    /** 打手状态变更（ACTIVE / HANGING / OFFLINE） */
+
     @PostMapping("/user/status")
-    public Mono<ApiResponse<String>> changeStatus(@RequestBody java.util.Map<String, String> body) {
+    public Mono<ApiResponse<String>> changeStatus(@RequestBody Map<String, String> body) {
         return Mono.fromCallable(() -> {
             Long userId = Long.valueOf(body.get("userId"));
             String statusStr = body.get("status");

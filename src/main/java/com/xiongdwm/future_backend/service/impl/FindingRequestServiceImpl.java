@@ -15,6 +15,7 @@ import com.xiongdwm.future_backend.service.OrderService;
 import com.xiongdwm.future_backend.service.UserService;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventBus;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
+import com.xiongdwm.future_backend.entity.User;
 
 import jakarta.annotation.Resource;
 
@@ -33,12 +34,17 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 	@Override
 	public boolean submit(FindingRequest findingRequest) {
         // 确保 palworld 是受管实体（客户端可能只传了 id）
-        if (findingRequest.getPalworld() != null && findingRequest.getPalworld().getId() != null) {
-            var user = userService.getUserById(findingRequest.getPalworld().getId());
-            findingRequest.setPalworld(user);
-        }
+        // if (findingRequest.getPalworld() != null && findingRequest.getPalworld().getId() != null) {
+        //     var user = userService.getUserById(findingRequest.getPalworld().getId());
+        //     findingRequest.setPalworld(user);
+        // }
         findingRequest.setRequestedAt(new Date());
         var saved=requestRepository.saveAndFlush(findingRequest);
+        var userId=findingRequest.getPalworld()!=null?findingRequest.getPalworld().getId():null;
+        if(null==userId)throw new RuntimeException("找单请求必须关联一个打手");
+        var user=userService.getUserById(userId);
+        user.setStatus(User.Status.ACTIVE);
+        userService.updateUser(user);
         eventBus.emit(domain, GlobalEventSpec.Action.CREATE, true,saved.getId());
         return saved!=null;
 	}
@@ -46,19 +52,33 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 	@Override
 	public boolean confirm(FindingRequestFillDto findingRequestDto) {
         var order=orderService.createOrderFromFindingRequest(findingRequestDto);
-        if(!order)throw new RuntimeException("创建订单失败");
+        if(null==order)throw new RuntimeException("创建订单失败");
         var request=requestRepository.findById(findingRequestDto.getRequestId()).orElse(null);
         if(request==null)throw new RuntimeException("找单请求不存在");
         request.setFulfilled(true);
         request.setFulfilledAt(new Date());
+        request.setOrder(order);
         requestRepository.saveAndFlush(request);
         eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true,request.getId());
         return true;
 	}
 
 	@Override
-	public List<FindingRequest> getRequests() {
+	public List<FindingRequest> getRequests(User user) {
+        if (user != null) {
+            return requestRepository.findByPalworldOrderByRequestedAtDesc(user);
+        }
         return requestRepository.findAll(Sort.by(Sort.Direction.DESC, "requestedAt"));
+	}
+
+	@Override
+	public boolean cancel(Long requestId) {
+		var request = requestRepository.findById(requestId).orElse(null);
+		if (request == null) throw new RuntimeException("找单请求不存在");
+		request.setFulfilled(null);
+		requestRepository.saveAndFlush(request);
+		eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true, request.getId());
+		return true;
 	}
     
 }

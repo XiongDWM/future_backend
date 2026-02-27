@@ -2,9 +2,14 @@ package com.xiongdwm.future_backend.entity;
 
 import java.util.Date;
 
+
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
@@ -16,13 +21,16 @@ public class FindingRequest {
     @Id
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     private Long id;
-    
-    private boolean man; // 男单true 女单false
+    @Column(nullable = true)
+    private Boolean man; // 男单true 女单false null不限
     private String description;
     private Date requestedAt;
     private Date fulfilledAt;
-    private boolean fulfilled;
+    @Column(nullable = true)
+    private Boolean fulfilled;
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "palworld_id", referencedColumnName = "id")
+    @JsonManagedReference("user-finding-requests")
     private User palworld; // 打手
     @OneToOne(fetch = FetchType.LAZY)
     private Order order;
@@ -32,10 +40,10 @@ public class FindingRequest {
     public void setId(Long id) {
         this.id = id;
     }
-    public boolean isMan() {
+    public Boolean isMan() {
         return man;
     }
-    public void setMan(boolean man) {
+    public void setMan(Boolean man) {
         this.man = man;
     }
     public String getDescription() {
@@ -56,10 +64,10 @@ public class FindingRequest {
     public void setFulfilledAt(Date fulfilledAt) {
         this.fulfilledAt = fulfilledAt;
     }
-    public boolean isFulfilled() {
+    public Boolean isFulfilled() {
         return fulfilled;
     }
-    public void setFulfilled(boolean fulfilled) {
+    public void setFulfilled(Boolean fulfilled) {
         this.fulfilled = fulfilled;
     }
     public User getPalworld() {

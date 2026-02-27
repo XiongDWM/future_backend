@@ -20,9 +20,11 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserActivityTracker activityTracker;
 
-    public SecurityConfig(JwtTokenProvider jwtTokenProvider) {
+    public SecurityConfig(JwtTokenProvider jwtTokenProvider, UserActivityTracker activityTracker) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.activityTracker = activityTracker;
     }
 
     @Bean
@@ -107,6 +109,15 @@ public class SecurityConfig {
             String role = claims.get("role", String.class);
             var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
             var auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+
+            // 滑动续期：token 过半生命周期，签发新 token 通过响应头返回
+            if (jwtTokenProvider.shouldRenew(claims)) {
+                String newToken = jwtTokenProvider.renewToken(claims);
+                exchange.getResponse().getHeaders().set("X-New-Token", newToken);
+            }
+
+            // 更新用户活跃时间（内存，无 IO）
+            try { activityTracker.touch(Long.parseLong(userId)); } catch (NumberFormatException ignored) {}
 
             return chain.filter(exchange)
                     .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));

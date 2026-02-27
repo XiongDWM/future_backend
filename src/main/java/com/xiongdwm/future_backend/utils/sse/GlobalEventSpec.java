@@ -14,6 +14,7 @@ public record GlobalEventSpec(
         ORDER("订单"),
         ORDER_SECTION("订单段"),
         SECOND_HAND("二手单"),
+        BOOKING("存单"),
         REJECTION_INFO("拒绝信息"),
         FINDING_REQUEST("找单"),
         ACCOUNT_RENTING("租账号");
@@ -29,7 +30,7 @@ public record GlobalEventSpec(
 
     public enum Action{
         SNAPSHOT("快照",false),
-        CREATE("创建", false),
+        CREATE("创建", true),
         UPDATE("更新", true),
         DELETE("删除", true);
 

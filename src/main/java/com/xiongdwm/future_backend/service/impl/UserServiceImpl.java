@@ -15,6 +15,7 @@ import com.xiongdwm.future_backend.entity.User;
 import com.xiongdwm.future_backend.repository.UserRepository;
 import com.xiongdwm.future_backend.service.UserService;
 import com.xiongdwm.future_backend.utils.exception.AuthenticationFailException;
+import com.xiongdwm.future_backend.utils.exception.ServiceException;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventBus;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 
@@ -31,7 +32,9 @@ public class UserServiceImpl implements UserService {
     public User authenticate(String username, String password) {
         var action=GlobalEventSpec.Action.UPDATE;
         var user=userRepository.findByUsernameAndPassword(username, password).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
-        user.setStatus(User.Status.ONLINE);
+        System.out.println("========authenticate user: "+user.getUsername()+"=========");
+        if(user.getRole()==User.Role.PALWORLD)throw new AuthenticationFailException("打手账号无权限登录平台");
+        if(user.getStatus()==User.Status.OFFLINE)user.setStatus(User.Status.ONLINE);
         user.setLastLogin(new Date());
         userRepository.saveAndFlush(user);
         eventBus.emit(domain, action, action.isFetchable(),user.getId());
@@ -41,9 +44,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public boolean regist(User user) {
+        if(user.getRole()!=User.Role.ADMIN&&user.getIdentity()==null)throw new ServiceException("注册必须提供身份证号");
+        if(user.getRole()!=User.Role.ADMIN&&user.getRealName()==null)throw new ServiceException("注册必须提供真实姓名");
         var action=GlobalEventSpec.Action.CREATE;
         user.setEnterDate(new Date());
-        user.setStatus(User.Status.HANGING);
+        user.setStatus(User.Status.OFFLINE);
         eventBus.emit(domain, action, action.isFetchable(), user.getId());
         return userRepository.save(user)!=null;
     }
@@ -53,8 +58,9 @@ public class UserServiceImpl implements UserService {
     public User authenticate(String username, String password, String softwareCode) {
         var action=GlobalEventSpec.Action.UPDATE;
         var user=userRepository.findByUsernameAndPassword(username, password).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
-        user.setStatus(User.Status.ACTIVE);
+        if(user.getStatus()==User.Status.OFFLINE)user.setStatus(User.Status.ONLINE);
         user.setSoftwareCode(softwareCode);
+        user.setLastLogin(new Date());
         userRepository.saveAndFlush(user);
         eventBus.emit(domain, action, action.isFetchable(), user.getId());
         return user;
@@ -120,6 +126,17 @@ public class UserServiceImpl implements UserService {
         var t=userRepository.saveAndFlush(user);
         eventBus.emit(domain, action, action.isFetchable(), user.getId());
         return t!=null;
+    }
+
+
+    @Override
+    public boolean logout(long userId) {
+        var user=userRepository.findById(userId).orElse(null);
+        if(user==null)return false;
+        if(user.getStatus()==User.Status.OFFLINE)throw new ServiceException("用户已离线"); 
+        user.setStatus(User.Status.OFFLINE);
+        user.setLastLogout(new Date());
+        return updateUser(user);
     }
 
 

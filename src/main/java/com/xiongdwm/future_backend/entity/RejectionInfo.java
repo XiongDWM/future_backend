@@ -2,6 +2,7 @@ package com.xiongdwm.future_backend.entity;
 
 import java.util.Date;
 
+
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.Column;
@@ -27,7 +28,7 @@ public class RejectionInfo {
     private Date occurAt;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="palworld_id", referencedColumnName = "id")
-    @JsonManagedReference
+    @JsonManagedReference("user-rejections")
     User palworld;
 
     public Long getId() {

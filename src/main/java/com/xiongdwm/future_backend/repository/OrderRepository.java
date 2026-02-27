@@ -21,4 +21,7 @@ public interface OrderRepository extends JpaRepository<Order, String>, JpaSpecif
     @Override
     @EntityGraph(attributePaths = {"palworld"})
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"palworld", "orderSections"})
+    java.util.Optional<Order> findWithSectionsByOrderId(String orderId);
 }

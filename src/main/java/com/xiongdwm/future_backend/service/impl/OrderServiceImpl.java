@@ -74,12 +74,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Page<Order> listOrders(int page, int size, Type type, Long userId, boolean todayOnly) {
+    public Page<Order> listOrders(int page, int size, Type type, Long userId, boolean todayOnly, String orderId) {
         var pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "issueDate"));
-
         Specification<Order> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            if (orderId != null) {
+                predicates.add(cb.equal(root.get("orderId"), orderId));
+            }
             if (type != null) {
                 predicates.add(cb.equal(root.get("type"), type));
             }
@@ -104,14 +106,15 @@ public class OrderServiceImpl implements OrderService {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-
-        return orderRepository.findAll(spec, pageable);
+        var result = orderRepository.findAll(spec, pageable);
+        return result;
     }
 
     @Override
     public boolean workWork(long palId, String orderId,String picStart) {
         var pal = userService.getUserById(palId);
-        if(pal==null||pal.getStatus()!=User.Status.ACTIVE)throw new ServiceException("异常");
+        System.out.println(pal);
+        if(pal==null||(pal.getStatus()!=User.Status.ONLINE&&pal.getStatus()!=User.Status.ACTIVE))throw new ServiceException("状态异常");
         var order = orderRepository.findById(orderId).orElse(null);
         if(order==null||!order.getType().isSelf())throw new ServiceException("订单不存在");
         order.setStatus(Order.Status.IN_PROGRESS);
@@ -129,6 +132,11 @@ public class OrderServiceImpl implements OrderService {
         section.setOrder(order);
         section.setPrice(order.getLowIncome());
         section.setAmount(order.getAmount());
+        section.setUnitType(order.getUnitType());
+        section.setStartDate(new Date());
+        // 预计结束时间=当前时间+amount*unitType折算成的小时
+        long durationMs = (long) (order.getAmount() * order.getUnitType().getMultiplier() * 60 * 60 * 1000);
+        section.setWillEndAt(new Date(System.currentTimeMillis() + durationMs));
         var sectionSuccess=sectionService.createOrderSection(section);
         return orderSuccess&&userSuccess&&sectionSuccess;
     }
@@ -159,13 +167,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public boolean continueOrder(String orderId, double price, double amount, Order.UnitType unitType,String additionalPic) {
         var order = orderRepository.findById(orderId).orElse(null);
+        
         if (order == null) throw new ServiceException("订单不存在");
-
+        System.out.println(order.getType());
         // 二手单必须上传截图，否则不允许续单
-        boolean isSecondHand = order.getType() == Order.Type.SECOND_HAND;
-        if (isSecondHand && (additionalPic == null || additionalPic.isBlank())) {
-            throw new ServiceException("二手单续单需要上传附加截图");
-        }
+        boolean isSecondHand = order.getType() == Order.Type.SECOND_HAND || order.getType() == Order.Type.SECOND_HAND_G;
+        if (isSecondHand && (additionalPic == null || additionalPic.isBlank())) throw new ServiceException("二手单续单需要上传附加截图");
+        
 
         Date now = new Date();
 
@@ -186,17 +194,16 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
             order.setStatus(Order.Status.IN_PROGRESS);
-            if (isSecondHand) {
-                order.setPicEnd(additionalPic);
-                order.setSecondHandStatus(Order.SecondHandStatus.THIRD_PARTY_TAKEN_PROCESS_DONE);
-            } 
-            orderRepository.saveAndFlush(order);
-            // 二手单推送两个事件：SECOND_HAND（消息盒子）+ ORDER（订单列表）
-            if (isSecondHand) {
-                eventBus.emit(GlobalEventSpec.Domain.SECOND_HAND, GlobalEventSpec.Action.UPDATE, true, orderId);
-            }
-            eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true, orderId);
         }
+        if (isSecondHand) {
+            order.setPicEnd(additionalPic);
+            order.setSecondHandStatus(Order.SecondHandStatus.THIRD_PARTY_TAKEN_PROCESS_DONE);
+        } 
+        orderRepository.saveAndFlush(order);
+        if (isSecondHand) {
+            eventBus.emit(GlobalEventSpec.Domain.SECOND_HAND, GlobalEventSpec.Action.UPDATE, true, orderId);
+        }
+        eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true, orderId);
 
         // 将该订单下所有未完成的section标记为已完成
         sectionService.finishAllSections(orderId);
@@ -220,11 +227,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
 	@Override
-	public boolean createOrderFromFindingRequest(FindingRequestFillDto findingRequestDto) {
+	public Order createOrderFromFindingRequest(FindingRequestFillDto findingRequestDto) {
         var order=new Order();
         var id=UUID.randomUUID().toString();
+        var gameTypeAndRank=findingRequestDto.getDescription().split("\\|");
         order.setOrderId(id);
         order.setType(findingRequestDto.getType());
+        order.setGameType(gameTypeAndRank[0]);
+        order.setRankInfo(gameTypeAndRank.length>1?gameTypeAndRank[1]:null);
         order.setAmount(findingRequestDto.getAmount());
         order.setUnitType(findingRequestDto.getUnitType());
         order.setLowIncome(findingRequestDto.getLowIncome());
@@ -233,36 +243,43 @@ public class OrderServiceImpl implements OrderService {
         order.setResource(findingRequestDto.getResource());
         createOrder(order);
         assignedOrderToUser(findingRequestDto.getPalId(), order.getOrderId());
-        return order!=null;
+        return order;
 	}
 
+    // 1. 查询订单，校验订单用户和登录用户是否一致，订单状态是否进行中
+    // 2。更新订单状态为已完成，记录结束时间和结算截图
+    // 3. 更新订单下的所有section为已完成，记录结束时间
+    // 4. 更新用户状态为Online
     @Override
     public boolean closeOrder(OrderCloseDto dto) {
-        // 1. 查询订单，校验订单用户和登录用户是否一致，订单状态是否进行中
-        // 2。更新订单状态为已完成，记录结束时间和结算截图
-        // 3. 更新订单下的所有section为已完成，记录结束时间
-        // 4. 更新用户状态为ACTIVE
         var order = orderRepository.findById(dto.getOrderId()).orElse(null);
         if (order == null) throw new ServiceException("订单不存在");
         var user = userService.getUserById(order.getUserId());
         // token中的用户信息获取
         // var tokenUserId = ; 
         if (user == null) throw new ServiceException("用户不存在");
-        if (order.getStatus() != Order.Status.IN_PROGRESS && order.getStatus() != Order.Status.THIRD_PARTY_TAKEN_PROCESS_DONE) {
+        if (order.getStatus() != Order.Status.IN_PROGRESS) {
             throw new ServiceException("订单状态不允许关闭");
         }
 
         order.setStatus(Order.Status.COMPLETED);
-        order.setEndAt(new Date());;
-        order.setPicEnd(dto.getPicString());
+        order.setEndAt(new Date());
+        if(order.getPicEnd()==null)order.setPicEnd(dto.getPicString());
         orderRepository.saveAndFlush(order);
+        var action=GlobalEventSpec.Action.UPDATE;
+        eventBus.emit(domain, action, action.isFetchable(), order.getOrderId());
 
         sectionService.finishAllSections(order.getOrderId());
 
-        user.setStatus(User.Status.ACTIVE);
+        user.setStatus(User.Status.ONLINE);
         userService.updateUser(user);
 
         return true;
+    }
+
+    @Override
+    public Order getOrderDetail(String orderId) {
+        return orderRepository.findWithSectionsByOrderId(orderId).orElse(null);
     }
 
     

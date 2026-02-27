@@ -7,6 +7,7 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,15 +45,25 @@ public class User {
     @Column
     @Enumerated(EnumType.STRING)
     private Status status;
-    @OneToMany(mappedBy = "palworld", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Column
+    @JsonIgnore
+    private String identity; // 身份证号
+    @Column 
+    private String realName; // 真实姓名
+
+
+    @OneToMany(mappedBy = "palworld",targetEntity = Order.class, orphanRemoval = true, cascade = CascadeType.ALL)
     @JsonBackReference
     private List<Order> orders = new ArrayList<>();
-    @OneToMany(mappedBy = "palworld", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "palworld", targetEntity = RejectionInfo.class, orphanRemoval = true, cascade = CascadeType.ALL)
     @JsonBackReference
     private List<RejectionInfo> rejectionInfos = new ArrayList<>();
-    @OneToMany(mappedBy = "palworld", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "palworld", targetEntity = BookOrder.class,orphanRemoval = true, cascade = CascadeType.ALL)
     @JsonBackReference
     private List<BookOrder> bookOrders = new ArrayList<>();
+    @OneToMany(mappedBy = "palworld", targetEntity = FindingRequest.class, orphanRemoval = true, cascade = CascadeType.ALL)
+    @JsonBackReference
+    private List<FindingRequest> findingRequests = new ArrayList<>();
 
     public enum Role {
         ADMIN("管理员"),
@@ -188,8 +199,35 @@ public class User {
     public void setBookOrders(List<BookOrder> bookOrders) {
         this.bookOrders = bookOrders;
     }
-    
-    
 
+    public List<FindingRequest> getFindingRequests() {
+        return findingRequests;
+    }
 
+    public void setFindingRequests(List<FindingRequest> findingRequests) {
+        this.findingRequests = findingRequests;
+    }
+
+    public String getIdentity() {
+        return identity;
+    }
+
+    public void setIdentity(String identity) {
+        this.identity = identity;
+    }
+
+    public String getRealName() {
+        return realName;
+    }
+
+    public void setRealName(String realName) {
+        this.realName = realName;
+    }
+
+    @Override
+    public String toString() {
+        return "User [id=" + id + ", username=" + username + ", enterDate=" + enterDate + ", leaveDate=" + leaveDate
+                + ", lastLogin=" + lastLogin + ", lastLogout=" + lastLogout + ", password=" + password
+                + ", softwareCode=" + softwareCode + ", role=" + role + ", status=" + status + "]";
+    }
 }
