@@ -86,6 +86,15 @@ public class OrderController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    @GetMapping("/web/finding/list")
+    public Mono<ApiResponse<List<FindingRequest>>> listFindingRequestsWeb(@RequestHeader(name = "Authorization", required = false) String token) {
+        var user = token != null ? tokenProvider.getUserFromRawToken(token) : null;
+        return Mono.fromCallable(() -> {
+            var list = findingRequestService.getRequests();
+            return ApiResponse.success(list);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
     @PostMapping("/finding/submit")
     public Mono<ApiResponse<String>> submitFindingRequest(@RequestBody FindingRequestParam param,@RequestHeader("Authorization") String token) {
         return Mono.fromCallable(() -> {

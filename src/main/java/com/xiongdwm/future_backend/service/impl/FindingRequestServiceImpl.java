@@ -70,10 +70,10 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 	@Override
 	public List<FindingRequest> getRequests(User user) {
         var since = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000);
-        if (user != null) {
-            return requestRepository.findByPalworldAndRequestedAtAfterOrderByRequestedAtDesc(user, since);
+        if (user == null) {
+            return requestRepository.findByRequestedAtAfterOrderByRequestedAtDesc(since);
         }
-        return requestRepository.findByRequestedAtAfterOrderByRequestedAtDesc(since);
+        return requestRepository.findByPalworldAndRequestedAtAfterOrderByRequestedAtDesc(user,since);
 	}
 
 	@Override
@@ -85,5 +85,11 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 		eventBus.emit(domain, GlobalEventSpec.Action.CANCEL, true, request.getId());
 		return true;
 	}
+
+        @Override
+        public List<FindingRequest> getRequests() {
+        var since = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000);
+        return requestRepository.findByRequestedAtAfterOrderByRequestedAtDesc(since);
+        }
     
 }
