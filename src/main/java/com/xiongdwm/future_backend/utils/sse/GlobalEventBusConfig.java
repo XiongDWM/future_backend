@@ -1,5 +1,8 @@
 package com.xiongdwm.future_backend.utils.sse;
 
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +24,15 @@ public class GlobalEventBusConfig {
     @Bean
     public Flux<GlobalEventSpec> globalEventFlux(Sinks.Many<GlobalEventSpec> globalEventSink) {
         return globalEventSink.asFlux()
+                .bufferTimeout(20, Duration.ofMillis(300))
+                .map(events -> {
+                    var merged = new LinkedHashMap<String, GlobalEventSpec>();
+                    for (var e : events) {
+                        merged.put(e.domain() + ":" + e.resourceId(), e);
+                    }
+                    return merged.values();
+                })
+                .flatMapIterable(Function.identity())
                 .onBackpressureLatest()
                 .doOnSubscribe(sub -> logger.info("New SSE client connected"))
                 .doOnCancel(() -> logger.info("SSE client disconnected"));
