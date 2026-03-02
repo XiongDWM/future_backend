@@ -31,7 +31,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public User authenticate(String username, String password) {
         var action=GlobalEventSpec.Action.UPDATE;
-        var user=userRepository.findByUsernameAndPassword(username, password).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
+        var user=userRepository.findByUsername(username).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
+        if(!user.getPassword().equals(password))throw new AuthenticationFailException("用户名或密码错误");
         System.out.println("========authenticate user: "+user.getUsername()+"=========");
         if(user.getRole()==User.Role.PALWORLD)throw new AuthenticationFailException("打手账号无权限登录平台");
         if(user.getStatus()==User.Status.OFFLINE)user.setStatus(User.Status.ONLINE);
@@ -57,7 +58,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public User authenticate(String username, String password, String softwareCode) {
         var action=GlobalEventSpec.Action.UPDATE;
-        var user=userRepository.findByUsernameAndPassword(username, password).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
+        var user=userRepository.findByUsername(username).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
+        if(!user.getPassword().equals(password))throw new AuthenticationFailException("用户名或密码错误");
         if(user.getStatus()==User.Status.OFFLINE)user.setStatus(User.Status.ONLINE);
         user.setSoftwareCode(softwareCode);
         user.setLastLogin(new Date());
