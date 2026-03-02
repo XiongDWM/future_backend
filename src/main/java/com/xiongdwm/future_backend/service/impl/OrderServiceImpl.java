@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -114,7 +113,7 @@ public class OrderServiceImpl implements OrderService {
     public boolean workWork(long palId, String orderId,String picStart) {
         var pal = userService.getUserById(palId);
         System.out.println(pal);
-        if(pal==null||(pal.getStatus()!=User.Status.ONLINE&&pal.getStatus()!=User.Status.ACTIVE))throw new ServiceException("状态异常");
+        if(pal==null||(pal.getStatus()!=User.Status.ONLINE&&pal.getStatus()!=User.Status.ACTIVE&&pal.getStatus()!=User.Status.PREPARE))throw new ServiceException("状态异常");
         var order = orderRepository.findById(orderId).orElse(null);
         if(order==null||!order.getType().isSelf())throw new ServiceException("订单不存在");
         order.setStatus(Order.Status.IN_PROGRESS);
@@ -127,8 +126,6 @@ public class OrderServiceImpl implements OrderService {
         var userSuccess=userService.updateUser(pal);
         // create first order section
         var section = new OrderSection();
-        var uuid=UUID.randomUUID().toString();
-        section.setOrderSubId(uuid);
         section.setOrder(order);
         section.setPrice(order.getLowIncome());
         section.setAmount(order.getAmount());
@@ -210,7 +207,6 @@ public class OrderServiceImpl implements OrderService {
 
         // 创建新的续单section
         var section = new OrderSection();
-        section.setOrderSubId(UUID.randomUUID().toString());
         section.setOrder(order);
         section.setPrice(price);
         section.setAmount(amount);
@@ -229,9 +225,7 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	public Order createOrderFromFindingRequest(FindingRequestFillDto findingRequestDto) {
         var order=new Order();
-        var id=UUID.randomUUID().toString();
         var gameTypeAndRank=findingRequestDto.getDescription().split("\\|");
-        order.setOrderId(id);
         order.setType(findingRequestDto.getType());
         order.setGameType(gameTypeAndRank[0]);
         order.setRankInfo(gameTypeAndRank.length>1?gameTypeAndRank[1]:null);
