@@ -1,51 +1,75 @@
 package com.xiongdwm.future_backend.utils.cache;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.Lock;
+import java.util.function.BiConsumer;
 
 public class LRUCache<K, V> {
-    private static class CacheEntry<K, V> implements Comparable<CacheEntry<K, V>> {
+
+    /** 双向链表节点 — 替代 PriorityQueue，remove/moveToTail 均 O(1) */
+    private static class Node<K, V> {
         K key;
         V value;
         long expireTime;
+        Node<K, V> prev, next;
 
-        public CacheEntry(K key, V value, long expireTime) {
+        Node(K key, V value, long expireTime) {
             this.key = key;
             this.value = value;
             this.expireTime = expireTime;
         }
 
         @Override
-        public int compareTo(CacheEntry<K, V> other) {
-            return Long.compare(this.expireTime, other.expireTime);
-        }
-
-        @Override
         public String toString() {
-            return "Entry{" +
-                    "key=" + key +
-                    ", value=" + value +
-                    ", expireTime=" + expireTime +
-                    '}';
+            return "Entry{key=" + key + ", value=" + value + ", expireTime=" + expireTime + '}';
         }
+    }
+
+    private final Node<K, V> head = new Node<>(null, null, 0); // sentinel
+    private final Node<K, V> tail = new Node<>(null, null, 0); // sentinel
+
+    private void linkToTail(Node<K, V> node) {
+        node.prev = tail.prev;
+        node.next = tail;
+        tail.prev.next = node;
+        tail.prev = node;
+    }
+
+    private void unlink(Node<K, V> node) {
+        node.prev.next = node.next;
+        node.next.prev = node.prev;
+        node.prev = null;
+        node.next = null;
+    }
+
+    private void moveToTail(Node<K, V> node) {
+        unlink(node);
+        linkToTail(node);
     }
 
     private final int capacity;
     private final long expireTimeLimit;
-    private final ConcurrentHashMap<K, CacheEntry<K, V>> map;
-    private final PriorityQueue<CacheEntry<K, V>> queue;
-    private final ReentrantReadWriteLock readWriteLock=new ReentrantReadWriteLock();
-    private final Lock readLock= readWriteLock.readLock();
-    private final Lock writeLock= readWriteLock.writeLock();
-    private static final long DEFAULT_EXPIRE_TIME = 5 * 60 * 1000; // default expire time is 5 minutes
-    private static final int DEFAULT_CAPACITY = 64; // default capacity is 32
-    private final ScheduledExecutorService scheduler;
+    private final HashMap<K, Node<K, V>> map;          // 外部已有锁，不需要 ConcurrentHashMap
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Lock readLock  = rwLock.readLock();
+    private final Lock writeLock = rwLock.writeLock();
+    private static final long DEFAULT_EXPIRE_TIME = 5 * 60 * 1000;
+    private static final int DEFAULT_CAPACITY = 64;
     private volatile K latest;
+    private volatile BiConsumer<K, V> evictionListener;
+
+    private static final ScheduledExecutorService SHARED_SCHEDULER =
+            Executors.newScheduledThreadPool(1, r -> {
+                Thread t = new Thread(r, "lru-cache-cleaner");
+                t.setDaemon(true);
+                return t;
+            });
+    private final ScheduledFuture<?> cleanupTask;
 
     // constructors
     public LRUCache() {
@@ -63,45 +87,55 @@ public class LRUCache<K, V> {
     public LRUCache(int capacity, long expireTimeLimit) {
         this.capacity = capacity;
         this.expireTimeLimit = expireTimeLimit;
-        this.map = new ConcurrentHashMap<>();
-        this.queue = new PriorityQueue<>();
+        this.map = new HashMap<>(capacity);
+        head.next = tail;
+        tail.prev = head;
 
-        this.scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(this::clearExpiredEntries, expireTimeLimit, expireTimeLimit,
-                TimeUnit.MILLISECONDS);
+        long interval = Math.max(expireTimeLimit / 4, 1000);   // 清理间隔取 1/4 TTL，兼顾精度和开销
+        this.cleanupTask = SHARED_SCHEDULER.scheduleAtFixedRate(
+                this::clearExpiredEntries, interval, interval, TimeUnit.MILLISECONDS);
+    }
+
+    /** 设置过期/淘汰回调，当条目被自动清理时触发 */
+    public void setEvictionListener(BiConsumer<K, V> listener) {
+        this.evictionListener = listener;
     }
 
     public V get(K key) {
-        readLock.lock();
-        try {
-            CacheEntry<K, V> entry = map.get(key);
-            if (entry == null || System.currentTimeMillis() >= entry.expireTime) {
-                return null;
-            }
-        } finally {
-            readLock.unlock();
-        }
+        // 滑动续期必须写，直接拿写锁，避免 read→write 的 TOCTOU 竞态
         writeLock.lock();
         try {
-            CacheEntry<K, V> current = map.get(key);
-            current.expireTime = System.currentTimeMillis() + expireTimeLimit;
-            queue.remove(current);
-            queue.offer(current);
-            latest=key;
-            return current.value;
-        }finally {
+            Node<K, V> node = map.get(key);
+            if (node == null || System.currentTimeMillis() >= node.expireTime) {
+                return null;
+            }
+            node.expireTime = System.currentTimeMillis() + expireTimeLimit;
+            moveToTail(node);
+            latest = key;
+            return node.value;
+        } finally {
             writeLock.unlock();
+        }
+    }
+
+    public V peek(K key) {
+        readLock.lock();
+        try {
+            Node<K, V> node = map.get(key);
+            if (node == null || System.currentTimeMillis() >= node.expireTime) {
+                return null;
+            }
+            return node.value;
+        } finally {
+            readLock.unlock();
         }
     }
 
     public List<K> getAllKeys() {
         readLock.lock();
         try {
-            if (isEmpty())
-                return Collections.emptyList();
-            List<K> keys = new ArrayList<>();
-            map.forEach((key, entry) -> keys.add(entry.key));
-            return keys;
+            if (map.isEmpty()) return Collections.emptyList();
+            return new ArrayList<>(map.keySet());
         } finally {
             readLock.unlock();
         }
@@ -110,34 +144,52 @@ public class LRUCache<K, V> {
     public void put(K key, V value) {
         writeLock.lock();
         try {
-            long currentTime = System.currentTimeMillis();
-            CacheEntry<K, V> entry = new CacheEntry<>(key, value, currentTime + expireTimeLimit);
-            if (map.containsKey(key)) {
-                CacheEntry<K, V> oldEntry = map.get(key);
-                map.remove(key);
-                queue.remove(oldEntry);
+            long now = System.currentTimeMillis();
+            Node<K, V> existing = map.get(key);
+            if (existing != null) {
+                existing.value = value;
+                existing.expireTime = now + expireTimeLimit;
+                moveToTail(existing);
+                latest = key;
+                return;
             }
             if (map.size() >= capacity) {
-                CacheEntry<K, V> eldestEntry = queue.poll();
-                if (eldestEntry != null) {
-                    map.remove(eldestEntry.key);
+                // 淘汰链表头部（最老的）
+                Node<K, V> eldest = head.next;
+                if (eldest != tail) {
+                    unlink(eldest);
+                    map.remove(eldest.key);
                 }
             }
-            map.put(key, entry);
+            Node<K, V> node = new Node<>(key, value, now + expireTimeLimit);
+            map.put(key, node);
+            linkToTail(node);
             latest = key;
-            queue.offer(entry);
         } finally {
             writeLock.unlock();
         }
     }
 
-    public Map.Entry<K,V> peek() {
+    public V remove(K key) {
+        writeLock.lock();
+        try {
+            Node<K, V> node = map.remove(key);
+            if (node != null) {
+                unlink(node);
+                return node.value;
+            }
+            return null;
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public Map.Entry<K, V> peek() {
         readLock.lock();
         try {
-            if (latest == null)
-                return null;
-            CacheEntry<K, V> entry = map.get(latest);
-            return entry == null ? null : new AbstractMap.SimpleEntry<>(entry.key, entry.value);
+            if (latest == null) return null;
+            Node<K, V> node = map.get(latest);
+            return node == null ? null : new AbstractMap.SimpleEntry<>(node.key, node.value);
         } finally {
             readLock.unlock();
         }
@@ -146,10 +198,9 @@ public class LRUCache<K, V> {
     public List<V> getAllValues() {
         readLock.lock();
         try {
-            if (isEmpty())
-                return Collections.emptyList();
-            List<V> values = new ArrayList<>();
-            map.forEach((key, entry) -> values.add(entry.value));
+            if (map.isEmpty()) return Collections.emptyList();
+            List<V> values = new ArrayList<>(map.size());
+            map.forEach((k, node) -> values.add(node.value));
             return values;
         } finally {
             readLock.unlock();
@@ -159,28 +210,44 @@ public class LRUCache<K, V> {
     public List<Map.Entry<K, V>> getAllKV() {
         readLock.lock();
         try {
-            if (isEmpty()) return Collections.emptyList();
-            List<Map.Entry<K, V>> entries = new ArrayList<>();
-            map.forEach((key, entry) -> entries.add(new AbstractMap.SimpleEntry<>(entry.key, entry.value)));
+            if (map.isEmpty()) return Collections.emptyList();
+            List<Map.Entry<K, V>> entries = new ArrayList<>(map.size());
+            map.forEach((k, node) -> entries.add(new AbstractMap.SimpleEntry<>(node.key, node.value)));
             return entries;
         } finally {
             readLock.unlock();
         }
     }
 
+    /**
+     * 从链表头部扫描过期节点 — 头部最老，遇到未过期即可 break，无需全表扫描。
+     */
     private void clearExpiredEntries() {
+        List<Node<K, V>> evicted = null;
         writeLock.lock();
         try {
-            Iterator<CacheEntry<K, V>> iterator = queue.iterator();
-            while (iterator.hasNext()) {
-                CacheEntry<K, V> expiredEntry = iterator.next();
-                if (expiredEntry != null && System.currentTimeMillis() >= expiredEntry.expireTime) {
-                    iterator.remove();
-                    map.remove(expiredEntry.key);
+            long now = System.currentTimeMillis();
+            Node<K, V> cur = head.next;
+            while (cur != tail) {
+                if (now < cur.expireTime) break;    // 后面的更新，不用继续
+                Node<K, V> next = cur.next;
+                unlink(cur);
+                map.remove(cur.key);
+                if (evictionListener != null) {
+                    if (evicted == null) evicted = new ArrayList<>();
+                    evicted.add(cur);
                 }
+                cur = next;
             }
         } finally {
             writeLock.unlock();
+        }
+        // 在锁外触发回调，避免死锁
+        if (evicted != null) {
+            var listener = this.evictionListener;
+            for (var node : evicted) {
+                try { listener.accept(node.key, node.value); } catch (Exception ignored) {}
+            }
         }
     }
 
@@ -192,56 +259,21 @@ public class LRUCache<K, V> {
         return map.size() >= capacity;
     }
 
-    public ConcurrentHashMap<K, CacheEntry<K, V>> getMap() {
-        return map;
+    public int size() {
+        readLock.lock();
+        try { return map.size(); }
+        finally { readLock.unlock(); }
     }
 
-    public PriorityQueue<CacheEntry<K, V>> getQueue() {
-        return queue;
-    }
-
-    // shutdown method to clear the cache and stop the scheduler
     public void shutdown() {
-        if(scheduler!=null){
-            scheduler.shutdown();
-        }
+        cleanupTask.cancel(false);
         writeLock.lock();
         try {
-            queue.clear();
             map.clear();
+            head.next = tail;
+            tail.prev = head;
         } finally {
             writeLock.unlock();
         }
     }
-
-    public static void main(String[] args) throws InterruptedException {
-        LRUCache<Integer, Integer> cache = new LRUCache<>(2, 1000 * 40);
-        cache.put(1, 1);
-        cache.put(2, 2);
-        System.out.println(cache.map.values());
-
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-        scheduler.schedule(() -> {
-            Integer v1 = cache.get(1);
-            System.out.println("================visit entry 1::" + v1 + "==================");
-        }, 30, TimeUnit.SECONDS);
-        scheduler.shutdown();
-
-        int capacity = 2;
-        LinkedHashMap<String, String> s = new LinkedHashMap<String, String>(capacity, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                return size() > capacity;
-            }
-        };
-        s.put("a", "a");
-        s.put("b", "b");
-        System.out.println(s.values());
-        System.out.println(s.get("b"));
-        System.out.println(s.values());
-        s.put("c", "c");
-        System.out.println(s);
-    }
-
 }

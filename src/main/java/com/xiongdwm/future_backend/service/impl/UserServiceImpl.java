@@ -13,11 +13,15 @@ import org.springframework.stereotype.Service;
 
 import com.xiongdwm.future_backend.entity.User;
 import com.xiongdwm.future_backend.repository.UserRepository;
+import com.xiongdwm.future_backend.service.LeaveRecordService;
 import com.xiongdwm.future_backend.service.UserService;
 import com.xiongdwm.future_backend.utils.exception.AuthenticationFailException;
 import com.xiongdwm.future_backend.utils.exception.ServiceException;
+import com.xiongdwm.future_backend.utils.security.UserActivityTracker;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventBus;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
+
+import jakarta.annotation.PostConstruct;
 
 
 @Service
@@ -25,8 +29,24 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private UserRepository userRepository;
     @Autowired
+    private LeaveRecordService leaveRecordService;
+    @Autowired
+    private UserActivityTracker activityTracker;
+    @Autowired
     private GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.USER; // 定义编译单元内主要操作的领域
+
+    @PostConstruct
+    public void restoreOnlineUsers() {
+        var onlineStatuses = List.of(User.Status.ONLINE, User.Status.ACTIVE, User.Status.PREPARE, User.Status.BUSY, User.Status.HANGING);
+        for (var status : onlineStatuses) {
+            var users = listUsers(1, 10000, null, status);
+            for (var user : users.getContent()) {
+                activityTracker.touch(user.getId());
+            }
+        }
+        System.out.println("============restore online users complete================>>>>");
+    }
 
     @Override
     public User authenticate(String username, String password) {
@@ -35,10 +55,14 @@ public class UserServiceImpl implements UserService {
         if(!user.getPassword().equals(password))throw new AuthenticationFailException("用户名或密码错误");
         System.out.println("========authenticate user: "+user.getUsername()+"=========");
         if(user.getRole()==User.Role.PALWORLD)throw new AuthenticationFailException("打手账号无权限登录平台");
-        if(user.getStatus()==User.Status.OFFLINE)user.setStatus(User.Status.ONLINE);
+        if(user.getStatus()==User.Status.ON_LEAVE) {
+            leaveRecordService.cancelLeaveByUser(user);
+        }
+        if(user.getStatus()==User.Status.OFFLINE||user.getStatus()==User.Status.ON_LEAVE)user.setStatus(User.Status.ONLINE);
         user.setLastLogin(new Date());
         userRepository.saveAndFlush(user);
         eventBus.emit(domain, action, action.isFetchable(),user.getId());
+        activityTracker.touch(user.getId());
         return user;
     }
 
@@ -60,11 +84,15 @@ public class UserServiceImpl implements UserService {
         var action=GlobalEventSpec.Action.UPDATE;
         var user=userRepository.findByUsername(username).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
         if(!user.getPassword().equals(password))throw new AuthenticationFailException("用户名或密码错误");
-        if(user.getStatus()==User.Status.OFFLINE)user.setStatus(User.Status.ONLINE);
+        if(user.getStatus()==User.Status.ON_LEAVE) {
+            leaveRecordService.cancelLeaveByUser(user);
+        }
+        if(user.getStatus()==User.Status.OFFLINE||user.getStatus()==User.Status.ON_LEAVE)user.setStatus(User.Status.ONLINE);
         user.setSoftwareCode(softwareCode);
         user.setLastLogin(new Date());
         userRepository.saveAndFlush(user);
         eventBus.emit(domain, action, action.isFetchable(), user.getId());
+        activityTracker.touch(user.getId());
         return user;
     }
 
@@ -135,6 +163,17 @@ public class UserServiceImpl implements UserService {
     public boolean logout(long userId) {
         var user=userRepository.findById(userId).orElse(null);
         if(user==null)return false;
+        if(user.getStatus()==User.Status.OFFLINE)throw new ServiceException("用户已离线"); 
+        user.setStatus(User.Status.OFFLINE);
+        user.setLastLogout(new Date());
+        return updateUser(user);
+    }
+
+    @Override
+    public boolean autoLogout(long userId) {
+        var user=userRepository.findById(userId).orElse(null);
+        if(user==null)return false;
+        if(user.getStatus()==User.Status.BUSY)return true;
         if(user.getStatus()==User.Status.OFFLINE)throw new ServiceException("用户已离线"); 
         user.setStatus(User.Status.OFFLINE);
         user.setLastLogout(new Date());

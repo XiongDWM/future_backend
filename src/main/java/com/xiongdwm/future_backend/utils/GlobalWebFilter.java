@@ -94,7 +94,7 @@ public class GlobalWebFilter implements WebFilter {
 
         // 取共享密钥
         LRUCache<String, SecretKey> km = cacheHandler.getCache(CryptoSessionConfig.CACHE_KM);
-        SecretKey sharedKey = km.get(sessionId);
+        SecretKey sharedKey = km.peek(sessionId);
         if (sharedKey == null) {
             return writeResponse(exchange, HttpStatus.FORBIDDEN,
                     ApiResponse.key_expired());

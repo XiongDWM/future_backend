@@ -1,44 +1,50 @@
 package com.xiongdwm.future_backend.utils.security;
 
+import org.slf4j.Logger;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import com.xiongdwm.future_backend.service.UserService;
+import com.xiongdwm.future_backend.utils.cache.CacheHandler;
+import com.xiongdwm.future_backend.utils.cache.LRUCache;
 
-/**
- * 内存中的用户最后活跃时间追踪器。
- * <p>
- * JWT filter 每次认证成功后调用 {@link #touch(long)} 更新时间戳，
- * 定时任务读取 {@link #getIdleUserIds(long)} 获取超时用户列表。
- * <p>
- * 不持久化、不写数据库，重启后自然清空。
- */
+import jakarta.annotation.PostConstruct;
+
 @Component
 public class UserActivityTracker {
 
-    /** userId → 最后活跃时间（System.currentTimeMillis） */
-    private final ConcurrentHashMap<Long, Long> lastActiveMap = new ConcurrentHashMap<>();
+    private static final String CACHE_NAME = "USER_ACTIVITY";
+    private static final long IDLE_TIMEOUT_MS = 30 * 60 * 1000L;
+    private static final int MAX_CAPACITY = 10000;
 
-    /** 记录用户活跃 */
-    public void touch(long userId) {
-        lastActiveMap.put(userId, System.currentTimeMillis());
+    private final CacheHandler cacheHandler;
+    private final ApplicationContext applicationContext;
+    private LRUCache<Long, Long> cache;
+    private final Logger logger;
+
+    public UserActivityTracker(CacheHandler cacheHandler, ApplicationContext applicationContext, Logger logger) {
+        this.cacheHandler = cacheHandler;
+        this.applicationContext = applicationContext;
+        this.logger = logger;
     }
 
-    /** 移除用户（登出后不再追踪） */
-    public void remove(long userId) {
-        lastActiveMap.remove(userId);
-    }
-
-    /** 获取所有空闲超过 timeoutMs 的用户 ID */
-    public Set<Long> getIdleUserIds(long timeoutMs) {
-        long cutoff = System.currentTimeMillis() - timeoutMs;
-        Set<Long> idle = ConcurrentHashMap.newKeySet();
-        for (Map.Entry<Long, Long> entry : lastActiveMap.entrySet()) {
-            if (entry.getValue() < cutoff) {
-                idle.add(entry.getKey());
+    @PostConstruct
+    public void init() {
+        cache = cacheHandler.getCache(CACHE_NAME, MAX_CAPACITY, IDLE_TIMEOUT_MS, (userId, lastActive) -> {
+            try {
+                applicationContext.getBean(UserService.class).autoLogout(userId);
+            } catch (Exception e) {
+                logger.info(e.getLocalizedMessage());
             }
-        }
-        return idle;
+        });
+    }
+
+    /** 记录用户活跃（滑动续期） */
+    public void touch(long userId) {
+        cache.put(userId, System.currentTimeMillis());
+    }
+
+    public void remove(long userId) {
+        cache.remove(userId);
     }
 }

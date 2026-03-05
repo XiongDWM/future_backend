@@ -21,5 +21,6 @@ public interface UserService {
     public boolean hangging(Long userId);
     public  boolean updateUser(User user);
     public boolean logout(long userId);
+    public boolean autoLogout(long userId);
 }
     

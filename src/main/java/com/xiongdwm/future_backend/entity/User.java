@@ -50,6 +50,8 @@ public class User {
     private String identity; // 身份证号
     @Column 
     private String realName; // 真实姓名
+    @Column
+    private boolean lastLogoutAuto=false; // 上次登出是否为自动登出（可能是掉线或者直接关闭程序,默认是正常登出）
 
 
     @OneToMany(mappedBy = "palworld",targetEntity = Order.class, orphanRemoval = true, cascade = CascadeType.ALL)
@@ -64,6 +66,12 @@ public class User {
     @OneToMany(mappedBy = "palworld", targetEntity = FindingRequest.class, orphanRemoval = true, cascade = CascadeType.ALL)
     @JsonBackReference
     private List<FindingRequest> findingRequests = new ArrayList<>();
+    @OneToMany(mappedBy = "user", targetEntity = WorkingTimeLog.class, orphanRemoval = true, cascade = CascadeType.ALL)
+    @JsonBackReference
+    private List<WorkingTimeLog> workingTimeLogs = new ArrayList<>();
+    @OneToMany(mappedBy = "user", targetEntity = LeaveRecord.class, orphanRemoval = true, cascade = CascadeType.ALL)
+    @JsonBackReference
+    private List<LeaveRecord> leaveRecords = new ArrayList<>();
 
     public enum Role {
         ADMIN("管理员"),
@@ -86,7 +94,8 @@ public class User {
         ONLINE("上线"),
         OFFLINE("下线"),
         BUSY("忙碌"),
-        INACTIVE("离职");
+        INACTIVE("离职"),
+        ON_LEAVE("休假");
         private final String statusName;
         private Status(String statusName) {
             this.statusName = this.name();
@@ -223,6 +232,14 @@ public class User {
     public void setRealName(String realName) {
         this.realName = realName;
     }
+    
+    public boolean isLastLogoutAuto() {
+        return lastLogoutAuto;
+    }
+
+    public void setLastLogoutAuto(boolean lastLogoutAuto) {
+        this.lastLogoutAuto = lastLogoutAuto;
+    }
 
     @Override
     public String toString() {
@@ -230,4 +247,6 @@ public class User {
                 + ", lastLogin=" + lastLogin + ", lastLogout=" + lastLogout + ", password=" + password
                 + ", softwareCode=" + softwareCode + ", role=" + role + ", status=" + status + "]";
     }
+    
+
 }

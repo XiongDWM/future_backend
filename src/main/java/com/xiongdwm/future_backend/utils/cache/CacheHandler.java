@@ -2,6 +2,7 @@ package com.xiongdwm.future_backend.utils.cache;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.BiConsumer;
 
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,15 @@ public class CacheHandler {
     @SuppressWarnings("unchecked")
     public<K,V> LRUCache<K, V> getCache(String name, int capacity, long expireTime) {
         return (LRUCache<K,V>)caches.computeIfAbsent(name, k -> new LRUCache<>(capacity, expireTime));
+    }
+
+    @SuppressWarnings("unchecked")
+    public<K,V> LRUCache<K, V> getCache(String name, int capacity, long expireTime, BiConsumer<K, V> evictionListener) {
+        return (LRUCache<K,V>)caches.computeIfAbsent(name, k -> {
+            var cache = new LRUCache<K, V>(capacity, expireTime);
+            cache.setEvictionListener(evictionListener);
+            return cache;
+        });
     }
 
     public boolean isEmptyWithinKey(String name){
