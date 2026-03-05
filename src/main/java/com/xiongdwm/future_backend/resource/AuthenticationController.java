@@ -3,6 +3,7 @@ package com.xiongdwm.future_backend.resource;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -58,6 +59,21 @@ public class AuthenticationController {
             if(!success) return ApiResponse.error("Logout failed");
             activityTracker.remove(Long.parseLong(userId));
             return ApiResponse.success("Logged out successfully");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/user/heartbeat")
+    public Mono<ApiResponse<String>> heartbeat() {
+        return Mono.just(ApiResponse.success("ok"));
+    }
+
+    @GetMapping("/user/me")
+    public Mono<ApiResponse<String>> me(@RequestHeader(name = "Authorization", required = true) String token) {
+        var userId = jwtTokenProvider.getUserId(token);
+        return Mono.fromCallable(() -> {
+            var user = authenticationService.getUserById(Long.parseLong(userId));
+            if (user == null) return ApiResponse.<String>error("用户不存在");
+            return ApiResponse.success(user.getStatus().name());
         }).subscribeOn(Schedulers.boundedElastic());
     }
 }
