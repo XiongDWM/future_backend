@@ -14,9 +14,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import jakarta.persistence.criteria.Predicate;
+import jakarta.transaction.Transactional;
 
 import com.xiongdwm.future_backend.bo.FindingRequestFillDto;
 import com.xiongdwm.future_backend.bo.OrderCloseDto;
+import com.xiongdwm.future_backend.bo.OrderDetailDto;
 import com.xiongdwm.future_backend.entity.Order;
 import com.xiongdwm.future_backend.entity.OrderSection;
 import com.xiongdwm.future_backend.entity.RejectionInfo;
@@ -48,6 +50,7 @@ public class OrderServiceImpl implements OrderService {
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.ORDER;
 
     @Override
+    @Transactional
     public boolean assignedOrderToUser(Long userId, String orderId) {
         var user = userService.getUserById(userId);
         if(user==null)throw new ServiceException("用户不存在");
@@ -63,12 +66,13 @@ public class OrderServiceImpl implements OrderService {
 
         var order = orderRepository.findById(orderId).orElse(null);
         if(order==null)throw new ServiceException("订单不存在");
+        if(order.getStatus()==Order.Status.CANCELLED)throw new ServiceException("订单已取消");
         order.setUserId(userId);
         order.setPalworld(user);
         order.setStatus(Order.Status.PENDING);
         orderRepository.saveAndFlush(order);
         var action=GlobalEventSpec.Action.UPDATE;
-        eventBus.emit(domain, action, action.isFetchable(), orderId);    
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(), orderId);    
         return true;
     }
 
@@ -77,6 +81,11 @@ public class OrderServiceImpl implements OrderService {
         var pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "issueDate"));
         Specification<Order> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // 排除协作子单，子单只跟随主单展示，但是当userId不为空时，协作子单也要参与查询条件过滤
+            if (userId == null) {
+                predicates.add(cb.notEqual(root.get("type"), Type.SUB_ORDER));
+            }
 
             if (orderId != null) {
                 predicates.add(cb.equal(root.get("orderId"), orderId));
@@ -88,19 +97,23 @@ public class OrderServiceImpl implements OrderService {
                 predicates.add(cb.equal(root.get("userId"), userId));
             }
             if (todayOnly) {
-                Calendar cal = Calendar.getInstance();
-                cal.set(Calendar.HOUR_OF_DAY, 0);
-                cal.set(Calendar.MINUTE, 0);
-                cal.set(Calendar.SECOND, 0);
-                cal.set(Calendar.MILLISECOND, 0);
-                Date startOfDay = cal.getTime();
-                cal.add(Calendar.DAY_OF_MONTH, 1);
-                Date startOfNextDay = cal.getTime();
-                predicates.add(cb.greaterThanOrEqualTo(root.get("issueDate"), startOfDay));
-                predicates.add(cb.lessThan(root.get("issueDate"), startOfNextDay));
-                // 排除已完成和已取消
-                predicates.add(cb.notEqual(root.get("status"), Order.Status.COMPLETED));
-                predicates.add(cb.notEqual(root.get("status"), Order.Status.CANCELLED));
+                Date now = new Date();
+                Date twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000L);
+                
+                Predicate withinTwentyFourHours = cb.greaterThanOrEqualTo(root.get("issueDate"), twentyFourHoursAgo);
+                
+                Predicate isSecondHand = cb.or(
+                    cb.equal(root.get("type"), Type.SECOND_HAND),
+                    cb.equal(root.get("type"), Type.SECOND_HAND_G)
+                );
+                Predicate secondHandStatusMatch = cb.or(
+                    cb.equal(root.get("secondHandStatus"), Order.SecondHandStatus.THIRD_PARTY_TAKEN_PROCESS_DONE),
+                    cb.equal(root.get("secondHandStatus"), Order.SecondHandStatus.THIRD_PARTY_SETTLEMENT_PULL)
+                );
+                Predicate secondHandCondition = cb.and(isSecondHand, secondHandStatusMatch);
+                
+                // 用 OR 连接两个大条件
+                predicates.add(cb.or(withinTwentyFourHours, secondHandCondition));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -110,17 +123,19 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
     public boolean workWork(long palId, String orderId,String picStart) {
         var pal = userService.getUserById(palId);
         System.out.println(pal);
         if(pal==null||(pal.getStatus()!=User.Status.ONLINE&&pal.getStatus()!=User.Status.ACTIVE&&pal.getStatus()!=User.Status.PREPARE))throw new ServiceException("状态异常");
         var order = orderRepository.findById(orderId).orElse(null);
         if(order==null||!order.getType().isSelf())throw new ServiceException("订单不存在");
+        if(order.getStatus()==Order.Status.CANCELLED)throw new ServiceException("订单已取消");
         order.setStatus(Order.Status.IN_PROGRESS);
         order.setPicStart(picStart);
         var orderSuccess=orderRepository.saveAndFlush(order)!=null;
         var action=GlobalEventSpec.Action.UPDATE;
-        eventBus.emit(domain, action, action.isFetchable(), orderId);
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(), orderId);
         // set pal status to busy
         pal.setStatus(User.Status.BUSY);
         var userSuccess=userService.updateUser(pal);
@@ -128,6 +143,7 @@ public class OrderServiceImpl implements OrderService {
         var section = new OrderSection();
         section.setOrder(order);
         section.setPrice(order.getLowIncome());
+        section.setConfirmed(true);
         section.setAmount(order.getAmount());
         section.setUnitType(order.getUnitType());
         section.setStartDate(new Date());
@@ -152,29 +168,32 @@ public class OrderServiceImpl implements OrderService {
         
     }
 
+    
+
     @Override
     public boolean createOrder(Order order) {
         var action=GlobalEventSpec.Action.CREATE;
         order.setIssueDate(new Date());
         var saved=orderRepository.saveAndFlush(order);
-        eventBus.emit(domain, action, action.isFetchable(),saved.getOrderId());
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(),saved.getOrderId());
         return saved!=null;
     }
 
     @Override
-    public boolean continueOrder(String orderId, double price, double amount, Order.UnitType unitType,String additionalPic) {
+    @Transactional
+    public boolean continueOrder(String orderId, double price, double amount, Order.UnitType unitType,String additionalPic,String continuePic) {
         var order = orderRepository.findById(orderId).orElse(null);
         
         if (order == null) throw new ServiceException("订单不存在");
+        if(order.getStatus()==Order.Status.CANCELLED)throw new ServiceException("订单已取消");
         System.out.println(order.getType());
-        // 二手单必须上传截图，否则不允许续单
-        boolean isSecondHand = order.getType() == Order.Type.SECOND_HAND || order.getType() == Order.Type.SECOND_HAND_G;
+        // 二手单第一次必须上传截图，否则不允许续单
+        boolean isSecondHand = (order.getType() == Order.Type.SECOND_HAND || order.getType() == Order.Type.SECOND_HAND_G)&&order.getSecondHandStatus()==null;
         if (isSecondHand && (additionalPic == null || additionalPic.isBlank())) throw new ServiceException("二手单续单需要上传附加截图");
         
 
         Date now = new Date();
 
-        // 状态校验
         if (order.getStatus() != Order.Status.IN_PROGRESS) {
             // 非进行中（如手滑点了完成），校验最近section是否在12小时内
             var sections = sectionService.findByOrderId(orderId);
@@ -198,12 +217,12 @@ public class OrderServiceImpl implements OrderService {
         } 
         orderRepository.saveAndFlush(order);
         if (isSecondHand) {
-            eventBus.emit(GlobalEventSpec.Domain.SECOND_HAND, GlobalEventSpec.Action.UPDATE, true, orderId);
+            eventBus.emitAfterCommit(GlobalEventSpec.Domain.SECOND_HAND, GlobalEventSpec.Action.UPDATE, true, orderId);
         }
-        eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true, orderId);
+        eventBus.emitAfterCommit(domain, GlobalEventSpec.Action.UPDATE, true, orderId);
 
         // 将该订单下所有未完成的section标记为已完成
-        sectionService.finishAllSections(orderId);
+        var lastEndTime = sectionService.finishAllSectionsAndGetLastEndTime(orderId);
 
         // 创建新的续单section
         var section = new OrderSection();
@@ -211,18 +230,21 @@ public class OrderServiceImpl implements OrderService {
         section.setPrice(price);
         section.setAmount(amount);
         section.setUnitType(unitType);
-        section.setStartDate(now);
+        section.setStartDate(lastEndTime);
         section.setRepeated(true);
         section.setFinished(false);
+        if (continuePic != null && !continuePic.isBlank()) {
+            section.setContinuePic(continuePic);
+        }
 
         // 计算预计结束时间: amount * unitType.multiplier 折算成小时
         long durationMs = (long) (amount * unitType.getMultiplier() * 60 * 60 * 1000);
-        section.setWillEndAt(new Date(now.getTime() + durationMs));
-
+        section.setWillEndAt(new Date(lastEndTime.getTime() + durationMs));
         return sectionService.createOrderSection(section);
     }
 
 	@Override
+	@Transactional
 	public Order createOrderFromFindingRequest(FindingRequestFillDto findingRequestDto) {
         var order=new Order();
         var gameTypeAndRank=findingRequestDto.getDescription().split("\\|");
@@ -240,28 +262,78 @@ public class OrderServiceImpl implements OrderService {
         return order;
 	}
 
-    // 1. 查询订单，校验订单用户和登录用户是否一致，订单状态是否进行中
-    // 2。更新订单状态为已完成，记录结束时间和结算截图
-    // 3. 更新订单下的所有section为已完成，记录结束时间
-    // 4. 更新用户状态为Online
     @Override
+    @Transactional
+    public Order addCollaborator(String parentOrderId, Long palId) {
+        var parentOrder = orderRepository.findById(parentOrderId).orElse(null);
+        if (parentOrder == null) throw new ServiceException("主工单不存在");
+        if (parentOrder.getType() == Order.Type.SUB_ORDER) throw new ServiceException("子单不能再添加协作者");
+        if (parentOrder.getStatus() == Order.Status.CANCELLED) throw new ServiceException("工单已取消");
+
+        var pal = userService.getUserById(palId);
+        if (pal == null) throw new ServiceException("打手不存在");
+        if (pal.getStatus() == User.Status.INACTIVE) throw new ServiceException("打手离职");
+        if (pal.getStatus() == User.Status.OFFLINE) throw new ServiceException("打手离线");
+
+        // 检查该打手是否已经是主单的打手
+        if (parentOrder.getUserId() != null && parentOrder.getUserId().equals(palId)) {
+            throw new ServiceException("该打手已是主单打手");
+        }
+        // 检查是否已有此打手的子单
+        var existingSub = parentOrder.getSubOrders().stream()
+                .filter(sub -> sub.getUserId() != null && sub.getUserId().equals(palId)
+                        && sub.getStatus() != Order.Status.CANCELLED)
+                .findAny();
+        if (existingSub.isPresent()) throw new ServiceException("该打手已是协作打手");
+
+        // 从父单复制数据创建子单
+        var subOrder = new Order();
+        subOrder.setType(Order.Type.SUB_ORDER);
+        subOrder.setParentOrder(parentOrder);
+        subOrder.setCustomer(parentOrder.getCustomer());
+        subOrder.setResource(parentOrder.getResource());
+        subOrder.setGameType(parentOrder.getGameType());
+        subOrder.setRankInfo(parentOrder.getRankInfo());
+        subOrder.setAmount(parentOrder.getAmount());
+        subOrder.setUnitType(parentOrder.getUnitType());
+        subOrder.setLowIncome(parentOrder.getLowIncome());
+        subOrder.setIssueDate(new Date());
+        subOrder.setUserId(palId);
+        subOrder.setPalworld(pal);
+        subOrder.setStatus(Order.Status.PENDING);
+
+        pal.setStatus(User.Status.PREPARE);
+        userService.updateUser(pal);
+
+        var saved = orderRepository.saveAndFlush(subOrder);
+        var action = GlobalEventSpec.Action.CREATE;
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(), saved.getOrderId());
+        return saved;
+    }
+
+    @Override
+    @Transactional
     public boolean closeOrder(OrderCloseDto dto) {
         var order = orderRepository.findById(dto.getOrderId()).orElse(null);
         if (order == null) throw new ServiceException("订单不存在");
         var user = userService.getUserById(order.getUserId());
-        // token中的用户信息获取
-        // var tokenUserId = ; 
         if (user == null) throw new ServiceException("用户不存在");
         if (order.getStatus() != Order.Status.IN_PROGRESS) {
             throw new ServiceException("订单状态不允许关闭");
         }
-
+        var isSecondHand=order.getSecondHandStatus()==null&&(order.getType()==Order.Type.SECOND_HAND||order.getType()==Order.Type.SECOND_HAND_G);
         order.setStatus(Order.Status.COMPLETED);
+        if(isSecondHand){
+            order.setSecondHandStatus(Order.SecondHandStatus.THIRD_PARTY_TAKEN_PROCESS_DONE);
+        }
         order.setEndAt(new Date());
         if(order.getPicEnd()==null)order.setPicEnd(dto.getPicString());
         orderRepository.saveAndFlush(order);
         var action=GlobalEventSpec.Action.UPDATE;
-        eventBus.emit(domain, action, action.isFetchable(), order.getOrderId());
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(), order.getOrderId());
+        if (isSecondHand) {
+            eventBus.emitAfterCommit(GlobalEventSpec.Domain.SECOND_HAND, GlobalEventSpec.Action.UPDATE, true, order.getOrderId());
+        }
 
         sectionService.finishAllSections(order.getOrderId());
 
@@ -273,7 +345,59 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Order getOrderDetail(String orderId) {
-        return orderRepository.findWithSectionsByOrderId(orderId).orElse(null);
+        return orderRepository.findDetailRootByOrderId(orderId).orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public OrderDetailDto getOrderDetailDto(String orderId) {
+        var order = orderRepository.findDetailRootByOrderId(orderId).orElse(null);
+        if (order == null) return null;
+
+        // 对于主单，分步加载子单（含 sections）后仅用于 DTO 组装，避免修改受管集合触发 orphanRemoval 异常
+        if (order.getType() != Order.Type.SUB_ORDER) {
+            var subOrders = orderRepository.findByParentOrderOrderId(orderId);
+            return OrderDetailDto.from(order, subOrders);
+        }
+
+        return OrderDetailDto.from(order);
+    }
+
+    @Override
+    public boolean cancelOrder(String orderId) {
+        var order = orderRepository.findById(orderId).orElse(null);
+        if (order == null) throw new ServiceException("订单不存在");
+        if(order.getStatus()==Order.Status.CANCELLED) throw new ServiceException("订单已取消");
+        order.setStatus(Order.Status.CANCELLED);    
+        orderRepository.saveAndFlush(order);
+        var action=GlobalEventSpec.Action.UPDATE;
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(), orderId);
+        return true;
+    }
+
+    @Override
+    public boolean orderSettle(String orderId) {
+        var order = orderRepository.findById(orderId).orElse(null);
+        if (order == null) throw new ServiceException("订单不存在");
+        if(order.getStatus()==Order.Status.CANCELLED) throw new ServiceException("订单已取消");
+        order.setSecondHandStatus(Order.SecondHandStatus.THIRD_PARTY_SETTLEMENT_PULL);
+        orderRepository.saveAndFlush(order);
+        var action=GlobalEventSpec.Action.UPDATE;
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(), orderId);
+        return true;
+    }
+
+    @Override
+    public boolean uploadSettlementPic(String orderId, String picString) {
+        var order = orderRepository.findById(orderId).orElse(null);
+        if (order == null) throw new ServiceException("订单不存在");
+        if(order.getStatus()==Order.Status.CANCELLED) throw new ServiceException("订单已取消");
+        order.setSecondHandStatus(Order.SecondHandStatus.THIRD_PARTY_SETTLED);
+        order.setAdditionalPic(picString);
+        orderRepository.saveAndFlush(order);
+        var action=GlobalEventSpec.Action.UPDATE;
+        eventBus.emitAfterCommit(domain, action, action.isFetchable(), orderId);
+        return true;
     }
 
     

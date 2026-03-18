@@ -17,7 +17,8 @@ public record GlobalEventSpec(
         BOOKING("存单"),
         REJECTION_INFO("拒绝信息"),
         FINDING_REQUEST("找单"),
-        ACCOUNT_RENTING("租账号");
+        ACCOUNT_RENTING("租账号"),
+        LEAVE_RECORD("休假记录");
 
         private final String label;
         private Domain(String label) {

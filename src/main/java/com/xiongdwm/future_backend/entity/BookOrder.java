@@ -12,7 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-// 存单
+// 存单 计算当月
 @Entity
 @Table(name="book_order")
 public class BookOrder {
@@ -37,6 +37,18 @@ public class BookOrder {
     private Long pid; // 打手id 冗余 repository查询用
     @Column
     private double remaining=0d; // 剩余数量，初始值等于amount，订单完成后会变成0，订单部分完成会小于amount但大于0
+    @Column
+    private Boolean confirmed=false; // 是否确认（客服或管理确认后才会结算), null:未确认，true:确认，false:拒绝
+    @Column 
+    private String rejectReason="N/A"; // 拒绝理由，仅当confirmed=false时有值 需要客服或管理人员填写，比如图片对不上转账等
+    @Column
+    private Long lastRechargeTime; // 上次充值时间，单位毫秒
+    @Column
+    private Long lastSettleTime; // 上次结算时间，单位毫秒
+    @Column
+    private Double lastRechargeValue; // 上次充值数量
+    
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "palworld_id", referencedColumnName = "id")
     @JsonManagedReference("user-book-orders")
@@ -108,4 +120,39 @@ public class BookOrder {
     public void setRemaining(double remaining) {
         this.remaining = remaining;
     }
+    public Boolean isConfirmed() {
+        return confirmed;
+    }
+    public void setConfirmed(Boolean confirmed) {
+        this.confirmed = confirmed;
+    }
+    public long getLastRechargeTime() {
+        return lastRechargeTime;
+    }
+    public void setLastRechargeTime(long lastRechargeTime) {
+        this.lastRechargeTime = lastRechargeTime;
+    }
+    public long getLastSettleTime() {
+        return lastSettleTime;
+    }
+    public void setLastSettleTime(long lastSettleTime) {
+        this.lastSettleTime = lastSettleTime;
+    }
+    public double getLastRechargeValue() {
+        return lastRechargeValue;
+    }
+    public void setLastRechargeValue(double lastRechargeValue) {
+        this.lastRechargeValue = lastRechargeValue;
+    }
+    public String getRejectReason() {
+        return rejectReason;
+    }
+    public void setRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
+    public Boolean getConfirmed() {
+        return confirmed;
+    }
+    
+    
 }

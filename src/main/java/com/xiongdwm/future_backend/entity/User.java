@@ -48,10 +48,14 @@ public class User {
     @Column
     @JsonIgnore
     private String identity; // 身份证号
+    @Column
+    private Date lastPaidDate; // 上次发工资（或结算）日期
     @Column 
     private String realName; // 真实姓名
     @Column
     private boolean lastLogoutAuto=false; // 上次登出是否为自动登出（可能是掉线或者直接关闭程序,默认是正常登出）
+    @Column
+    private boolean deleted=false; // 软删除标志
 
 
     @OneToMany(mappedBy = "palworld",targetEntity = Order.class, orphanRemoval = true, cascade = CascadeType.ALL)
@@ -240,13 +244,43 @@ public class User {
     public void setLastLogoutAuto(boolean lastLogoutAuto) {
         this.lastLogoutAuto = lastLogoutAuto;
     }
+    public Date getLastPaidDate() {
+        return lastPaidDate;
+    }
 
+    public void setLastPaidDate(Date lastPaidDate) {
+        this.lastPaidDate = lastPaidDate;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
+    }
+
+    public List<WorkingTimeLog> getWorkingTimeLogs() {
+        return workingTimeLogs;
+    }
+
+    public void setWorkingTimeLogs(List<WorkingTimeLog> workingTimeLogs) {
+        this.workingTimeLogs = workingTimeLogs;
+    }
+
+    public List<LeaveRecord> getLeaveRecords() {
+        return leaveRecords;
+    }
+
+    public void setLeaveRecords(List<LeaveRecord> leaveRecords) {
+        this.leaveRecords = leaveRecords;
+    }
+    
     @Override
     public String toString() {
         return "User [id=" + id + ", username=" + username + ", enterDate=" + enterDate + ", leaveDate=" + leaveDate
                 + ", lastLogin=" + lastLogin + ", lastLogout=" + lastLogout + ", password=" + password
                 + ", softwareCode=" + softwareCode + ", role=" + role + ", status=" + status + "]";
     }
-    
 
 }

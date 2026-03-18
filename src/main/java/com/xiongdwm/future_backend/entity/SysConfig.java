@@ -9,8 +9,9 @@ import jakarta.persistence.Table;
 @Table(name="sys_config")
 public class SysConfig {
     @Id
+    @Column(name = "`key`")
     private String key;
-    @Column
+    @Column(name = "`value`")
     private String value;
 
     

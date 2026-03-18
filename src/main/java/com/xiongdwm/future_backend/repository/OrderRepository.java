@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import com.xiongdwm.future_backend.entity.Order;
+import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, String>, JpaSpecificationExecutor<Order> {
@@ -23,5 +24,8 @@ public interface OrderRepository extends JpaRepository<Order, String>, JpaSpecif
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);
 
     @EntityGraph(attributePaths = {"palworld", "orderSections"})
-    java.util.Optional<Order> findWithSectionsByOrderId(String orderId);
+    java.util.Optional<Order> findDetailRootByOrderId(String orderId);
+
+    @EntityGraph(attributePaths = {"palworld", "orderSections"})
+    List<Order> findByParentOrderOrderId(String parentOrderId);
 }

@@ -18,6 +18,7 @@ import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 import com.xiongdwm.future_backend.entity.User;
 
 import jakarta.annotation.Resource;
+import jakarta.transaction.Transactional;
 
 @Service
 public class FindingRequestServiceImpl implements FindingRequestService {
@@ -51,6 +52,7 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 	}
 
 	@Override
+        @Transactional
 	public boolean confirm(FindingRequestFillDto findingRequestDto) {
         var request=requestRepository.findById(findingRequestDto.getRequestId()).orElse(null);
         if(request==null)throw new ServiceException("找单请求不存在");
@@ -59,11 +61,18 @@ public class FindingRequestServiceImpl implements FindingRequestService {
         var order=orderService.createOrderFromFindingRequest(findingRequestDto);
         if(null==order)throw new ServiceException("创建订单失败");
 
+        // 为协作打手创建子单
+        if (findingRequestDto.getCollaboratorPalIds() != null) {
+            for (Long collabPalId : findingRequestDto.getCollaboratorPalIds()) {
+                orderService.addCollaborator(order.getOrderId(), collabPalId);
+            }
+        }
+
         request.setFulfilled(true);
         request.setFulfilledAt(new Date());
         request.setOrder(order);
         requestRepository.saveAndFlush(request);
-        eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true,request.getId());
+        eventBus.emitAfterCommit(domain, GlobalEventSpec.Action.UPDATE, true,request.getId());
         return true;
 	}
 

@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 
 import com.xiongdwm.future_backend.bo.FindingRequestFillDto;
 import com.xiongdwm.future_backend.bo.OrderCloseDto;
+import com.xiongdwm.future_backend.bo.OrderDetailDto;
 import com.xiongdwm.future_backend.entity.Order;
 
 import jakarta.annotation.Nullable;
@@ -17,10 +18,14 @@ public interface OrderService {
     public boolean workWork(long palId, String orderId,String picStart); 
     // 接单确认，new 一个section，如果拒绝，输入规则，消息总线推送消息，要求重派
     public void reject(Long palId, boolean isConfirmed, String info,String orderId);
-    public boolean continueOrder(String orderId,double price,double amount,Order.UnitType unitType,@Nullable String additionalPic);
+    public boolean continueOrder(String orderId,double price,double amount,Order.UnitType unitType,@Nullable String additionalPic,@Nullable String continuePic);
     public Order createOrderFromFindingRequest(FindingRequestFillDto findingRequestDto);
     public boolean closeOrder(OrderCloseDto dto);
     public Order getOrderDetail(String orderId);
-    
+    public OrderDetailDto getOrderDetailDto(String orderId);
+    public boolean cancelOrder(String orderId);
+    public boolean orderSettle(String orderId);
+    public boolean uploadSettlementPic(String orderId, String picString);
+    public Order addCollaborator(String parentOrderId, Long palId); // 为工单添加协作打手（创建子单）
     
 }

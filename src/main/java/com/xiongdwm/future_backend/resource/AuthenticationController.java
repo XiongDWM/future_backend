@@ -64,7 +64,8 @@ public class AuthenticationController {
 
     @GetMapping("/user/heartbeat")
     public Mono<ApiResponse<String>> heartbeat() {
-        return Mono.just(ApiResponse.success("ok"));
+        System.out.println("===============heartbeat===============>>");
+        return Mono.just(ApiResponse.success("boomboom"));
     }
 
     @GetMapping("/user/me")

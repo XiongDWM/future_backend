@@ -116,7 +116,6 @@ public class SecurityConfig {
                 exchange.getResponse().getHeaders().set("X-New-Token", newToken);
             }
 
-            // 更新用户活跃时间（内存，无 IO）
             try { activityTracker.touch(Long.parseLong(userId)); } catch (NumberFormatException ignored) {}
 
             return chain.filter(exchange)

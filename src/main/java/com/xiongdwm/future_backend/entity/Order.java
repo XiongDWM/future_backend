@@ -1,10 +1,12 @@
 package com.xiongdwm.future_backend.entity;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.annotation.Nullable;
@@ -79,6 +81,16 @@ public class Order {
     @JsonManagedReference("user-orders")
     private User palworld; // 打手
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_order_id")
+    @JsonBackReference("order-suborders")
+    private Order parentOrder; // 协作子单关联的父单，null表示这是一个主单
+
+    @OneToMany(mappedBy = "parentOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    @JsonManagedReference("order-suborders")
+    private List<Order> subOrders = new ArrayList<>(); // 协作子单列表 可以为null
+
     @OneToMany(mappedBy = "order", targetEntity = OrderSection.class, cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonBackReference
     private List<OrderSection> orderSections;
@@ -90,7 +102,8 @@ public class Order {
         SECOND_HAND("二手男单", true),
         SECOND_HAND_G("二手女单/Ai", true),
         THIRD_PARTY("甩单", false),
-        LONG_TERM("长时间订单", true); 
+        LONG_TERM("长时间订单", true),
+        SUB_ORDER("协作子单", true); // 多打手协作时的子工单
 
         private final String targetText;
         private final boolean isSelf;
@@ -185,6 +198,18 @@ public class Order {
     }
     public void setPalworld(User palworld) {
         this.palworld = palworld;
+    }
+    public Order getParentOrder() {
+        return parentOrder;
+    }
+    public void setParentOrder(Order parentOrder) {
+        this.parentOrder = parentOrder;
+    }
+    public List<Order> getSubOrders() {
+        return subOrders;
+    }
+    public void setSubOrders(List<Order> subOrders) {
+        this.subOrders = subOrders;
     }
     public List<OrderSection> getOrderSections() {
         return orderSections;

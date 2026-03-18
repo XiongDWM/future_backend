@@ -41,8 +41,15 @@ public class OrderSection {
     @Column
     private boolean finished=false; // 是否完成
     @Column
+    private String continuePic; // 续单截图
+    @Column
     @Enumerated(EnumType.STRING)
     private Order.UnitType unitType;
+    @Column
+    private Boolean confirmed; // 是否确认（仅用于续单，客服或管理确认后才会结算）
+    @Column
+    private String rejectReason="-"; // 拒绝理由，仅当confirmed=false         需要客服或管理人员填写，比如图片对不上转账等
+    
 
 
     @ManyToOne(fetch = FetchType.LAZY, targetEntity = Order.class)
@@ -149,6 +156,38 @@ public class OrderSection {
 	public void setFinished(boolean finished) {
 		this.finished = finished;
 	}
+
+
+	public String getContinuePic() {
+		return continuePic;
+	}
+
+
+	public void setContinuePic(String continuePic) {
+		this.continuePic = continuePic;
+	}
+
+
+    public Boolean getConfirmed() {
+        return confirmed;
+    }
+
+
+    public void setConfirmed(Boolean confirmed) {
+        this.confirmed = confirmed;
+    }
+
+
+    public String getRejectReason() {
+        return rejectReason;
+    }
+
+
+    public void setRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
+
+    
     
 
     

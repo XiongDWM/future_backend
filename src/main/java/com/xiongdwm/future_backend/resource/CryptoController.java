@@ -1,10 +1,13 @@
 package com.xiongdwm.future_backend.resource;
 
+
 import com.xiongdwm.future_backend.bo.ApiResponse;
 import com.xiongdwm.future_backend.utils.cache.CacheHandler;
 import com.xiongdwm.future_backend.utils.cache.LRUCache;
 import com.xiongdwm.future_backend.utils.ecc.CryptoSessionConfig;
 import com.xiongdwm.future_backend.utils.ecc.ECDHKeyGen;
+
+import java.util.logging.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +25,7 @@ public class CryptoController {
 
     @Autowired
     private CacheHandler cacheHandler;
+    Logger logger = Logger.getLogger(CryptoController.class.getName());
 
     /**
      * 单次握手接口
@@ -32,13 +36,13 @@ public class CryptoController {
      * <p>
      * 响应:
      *   Header  X-Server-Key: {serverPublicKey base64}
-     *   Header  X-Session-Id: {sessionId}
+     *   Header  X-Session-Id: {sessionId - key for shared secret in km cache}
      *   Body:   伪装的无意义内容
      */
     @PostMapping("/crypto/handshake")
     public ApiResponse<String> handshake(ServerWebExchange exchange) {
         String clientKeyBase64 = exchange.getRequest().getHeaders().getFirst("X-Client-Key");
-        System.out.println("收到握手请求");
+        logger.info("收到握手请求");
         if (clientKeyBase64 == null || clientKeyBase64.isBlank()) {
             return ApiResponse.bussiness_error("something went wrong");
         }

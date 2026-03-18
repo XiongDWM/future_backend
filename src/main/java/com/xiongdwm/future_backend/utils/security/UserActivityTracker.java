@@ -1,6 +1,7 @@
 package com.xiongdwm.future_backend.utils.security;
 
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -16,16 +17,15 @@ public class UserActivityTracker {
     private static final String CACHE_NAME = "USER_ACTIVITY";
     private static final long IDLE_TIMEOUT_MS = 30 * 60 * 1000L;
     private static final int MAX_CAPACITY = 10000;
+    private static final Logger logger = LoggerFactory.getLogger(UserActivityTracker.class);
 
     private final CacheHandler cacheHandler;
     private final ApplicationContext applicationContext;
     private LRUCache<Long, Long> cache;
-    private final Logger logger;
 
-    public UserActivityTracker(CacheHandler cacheHandler, ApplicationContext applicationContext, Logger logger) {
+    public UserActivityTracker(CacheHandler cacheHandler, ApplicationContext applicationContext) {
         this.cacheHandler = cacheHandler;
         this.applicationContext = applicationContext;
-        this.logger = logger;
     }
 
     @PostConstruct

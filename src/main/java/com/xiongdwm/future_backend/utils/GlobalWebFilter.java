@@ -3,6 +3,9 @@ package com.xiongdwm.future_backend.utils;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.crypto.SecretKey;
 
 import org.reactivestreams.Publisher;
@@ -36,6 +39,8 @@ import reactor.core.publisher.Mono;
 
 @Component
 public class GlobalWebFilter implements WebFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(GlobalWebFilter.class);
 
     private static final String SESSION_HEADER = "X-Session-Id";
     private static final String TIMESTAMP_HEADER = "X-Timestamp";
@@ -75,7 +80,7 @@ public class GlobalWebFilter implements WebFilter {
 
         // 握手接口完全放行
         if (FULLY_EXCLUDED_PATHS.contains(path)) {
-            System.out.println("握手接口放行");
+            logger.info("握手接口放行");
             return chain.filter(exchange);
         }
 
@@ -173,7 +178,6 @@ public class GlobalWebFilter implements WebFilter {
             String method, String path, String timestampStr, String signature) {
 
         ServerHttpRequest request = exchange.getRequest();
-        System.out.println("get request");
 
         return DataBufferUtils.join(request.getBody())
                 .defaultIfEmpty(DefaultDataBufferFactory.sharedInstance.wrap(new byte[0]))
@@ -227,10 +231,10 @@ public class GlobalWebFilter implements WebFilter {
                                 return h;
                             }
                         };
-                        System.out.println("请求体解密成功: " + decrypted);
+                        logger.info("请求体解密成功: " + decrypted);
                         return Mono.just(exchange.mutate().request(mutated).build());
                     } catch (Exception e) {
-                        System.out.println("请求体解密失败: " + e.getMessage());
+                        logger.info("请求体解密失败: {}", e.getMessage());
                         return writeResponse(exchange, HttpStatus.OK,
                                 ApiResponse.bussiness_error("请求体解密失败"))
                                 .then(Mono.<ServerWebExchange>empty());
@@ -262,6 +266,7 @@ public class GlobalWebFilter implements WebFilter {
                                 getHeaders().set(HttpHeaders.CONTENT_TYPE, "text/plain;charset=UTF-8");
                                 return super.writeWith(Mono.just(factory.wrap(encBytes)));
                             } catch (Exception e) {
+                                logger.info("响应体加密失败: {}", e.getMessage());
                                 return super.writeWith(Mono.just(factory.wrap(responseBytes)));
                             }
                         });
@@ -284,6 +289,7 @@ public class GlobalWebFilter implements WebFilter {
             byte[] body = MAPPER.writeValueAsBytes(apiResponse);
             return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
         } catch (JsonProcessingException | RuntimeException e) {
+            logger.info("写出错误响应失败: {}", e.getMessage());
             byte[] fallback = JacksonUtil.toJsonString(ApiResponse.error("未知错误")).orElse("{\"success\":false,\"code\":500,\"data\":\"未知错误\"}")
                     .getBytes(StandardCharsets.UTF_8);
             return response.writeWith(Mono.just(response.bufferFactory().wrap(fallback)));

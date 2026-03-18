@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xiongdwm.future_backend.bo.ApiResponse;
@@ -11,11 +12,13 @@ import com.xiongdwm.future_backend.bo.FindingRequestFillDto;
 import com.xiongdwm.future_backend.bo.FindingRequestParam;
 import com.xiongdwm.future_backend.bo.OrderCloseDto;
 import com.xiongdwm.future_backend.bo.OrderDetailDto;
+import com.xiongdwm.future_backend.bo.OrderListItemDto;
 import com.xiongdwm.future_backend.bo.PageableParam;
 import com.xiongdwm.future_backend.bo.WorkWorkParam;
 import com.xiongdwm.future_backend.entity.FindingRequest;
 import com.xiongdwm.future_backend.entity.Order;
 import com.xiongdwm.future_backend.service.FindingRequestService;
+import com.xiongdwm.future_backend.service.OrderSectionService;
 import com.xiongdwm.future_backend.service.OrderService;
 import com.xiongdwm.future_backend.utils.JacksonUtil;
 import com.xiongdwm.future_backend.utils.security.JwtTokenProvider;
@@ -38,10 +41,12 @@ public class OrderController {
     @Resource
     private FindingRequestService findingRequestService;
     @Resource
+    private OrderSectionService orderSectionService;
+    @Resource
     private JwtTokenProvider tokenProvider;
 
     @PostMapping("/order/list")
-    public Mono<ApiResponse<Page<Order>>> listOrders(@RequestBody PageableParam param,@RequestHeader(name="Authorization", required=false) String token) {
+    public Mono<ApiResponse<Page<OrderListItemDto>>> listOrders(@RequestBody PageableParam param,@RequestHeader(name="Authorization", required=false) String token) {
         return Mono.fromCallable(() -> {
             var filters = param.getFilters();
             var type = filters != null && filters.containsKey("type") && !filters.get("type").isBlank()
@@ -55,17 +60,54 @@ public class OrderController {
                     ? filters.get("orderId")
                     : null;
             var page = orderService.listOrders(param.getPageNumber() + 1, param.getPageSize(), type, userId, todayOnly, orderId);
-            return ApiResponse.success(page);
+            return ApiResponse.success(page.map(OrderListItemDto::fromEntity));
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    /** 订单详情（含 sections） */
-    @GetMapping("/order/detail")
-    public Mono<ApiResponse<OrderDetailDto>> orderDetail(@org.springframework.web.bind.annotation.RequestParam("orderId") String orderId) {
+    @PostMapping("/order/cancel")
+    public Mono<ApiResponse<String>> cancelOrder(@RequestBody Map<String, String> orderId) {
         return Mono.fromCallable(() -> {
-            var order = orderService.getOrderDetail(orderId);
-            if (order == null) return ApiResponse.<OrderDetailDto>error(null);
-            return ApiResponse.success(OrderDetailDto.fromEntity(order));
+            var id = orderId.get("orderId");
+            System.out.println("取消订单: " + id);
+            var success = orderService.cancelOrder(id);
+            return success ? ApiResponse.success("订单已取消") : ApiResponse.<String>error("订单取消失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+    @PostMapping("/order/settlement")
+    public Mono<ApiResponse<String>> settleOrder(@RequestBody Map<String, String> orderId) {
+        return Mono.fromCallable(() -> {
+            var id = orderId.get("orderId");
+            var success = orderService.orderSettle(id);
+            return success ? ApiResponse.success("订单已结算") : ApiResponse.<String>error("订单结算失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+    @PostMapping("/section/audit")
+    public Mono<ApiResponse<String>> auditSection(@RequestBody Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            String subId = body.get("subId");
+            boolean confirm = Boolean.parseBoolean(body.get("confirm"));
+            String rejectReason = body.get("rejectReason");
+            var success = orderSectionService.audit(subId, confirm, rejectReason);
+            return success ? ApiResponse.success("审核成功") : ApiResponse.<String>error("审核失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/order/upload-settlement")
+    public Mono<ApiResponse<String>> uploadSettlementPic(@RequestBody Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            String orderId = body.get("orderId");
+            String picString = body.get("picString");
+            var success = orderService.uploadSettlementPic(orderId, picString);
+            return success ? ApiResponse.success("上传成功") : ApiResponse.<String>error("上传失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/order/detail")
+    public Mono<ApiResponse<OrderDetailDto>> orderDetail(@RequestParam("orderId") String orderId) {
+        return Mono.fromCallable(() -> {
+            var dto = orderService.getOrderDetailDto(orderId);
+            if (dto == null) return ApiResponse.<OrderDetailDto>error(null);
+            return ApiResponse.success(dto);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -88,7 +130,6 @@ public class OrderController {
 
     @GetMapping("/web/finding/list")
     public Mono<ApiResponse<List<FindingRequest>>> listFindingRequestsWeb(@RequestHeader(name = "Authorization", required = false) String token) {
-        var user = token != null ? tokenProvider.getUserFromRawToken(token) : null;
         return Mono.fromCallable(() -> {
             var list = findingRequestService.getRequests();
             return ApiResponse.success(list);
@@ -157,8 +198,20 @@ public class OrderController {
             var unitType = Order.UnitType.valueOf(
                     body.getOrDefault("unitType", "HOUR"));
             String additionalPic = body.get("additionalPic");
-            var success = orderService.continueOrder(orderId, price, amount, unitType, additionalPic);
+            String continuePic = body.get("continuePic");
+            var success = orderService.continueOrder(orderId, price, amount, unitType, additionalPic, continuePic);
             return success ? ApiResponse.success("续单成功") : ApiResponse.<String>error("续单失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 为工单添加协作打手（创建子单） */
+    @PostMapping("/order/collaborator")
+    public Mono<ApiResponse<String>> addCollaborator(@RequestBody Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            String orderId = body.get("orderId");
+            Long palId = Long.valueOf(body.get("palId"));
+            var subOrder = orderService.addCollaborator(orderId, palId);
+            return subOrder != null ? ApiResponse.success(subOrder.getOrderId()) : ApiResponse.<String>error("添加协作失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
 }

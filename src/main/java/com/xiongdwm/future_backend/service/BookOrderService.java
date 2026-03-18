@@ -10,5 +10,11 @@ import com.xiongdwm.future_backend.entity.User;
 public interface BookOrderService {
     boolean createBookOrder(BookOrderParam param,User user);
     Page<BookOrder> listBookOrders(int page, int size, String customer, String customerId, Long pid);
+    void startBookOrder(Long orderId);
+    void updateBookOrder(BookOrderParam param);
+    boolean confirmBookOrder(Long orderId);
+    boolean rechargeBookOrder(Long orderId, int amount, double price);
+    boolean rejectBookOrder(Long orderId, String rejectReason);
+
 
 }

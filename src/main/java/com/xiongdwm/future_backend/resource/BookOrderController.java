@@ -71,8 +71,25 @@ public class BookOrderController {
      * @return 是否成功
      */
     @PostMapping("/bookOrder/starting")
-    public ApiResponse<String> startBookOrder(@RequestBody Long orderId,@RequestHeader("Authorization") String token) {
-
+    public ApiResponse<String> startBookOrder(@RequestBody Long orderId) {
+        bookOrderService.startBookOrder(orderId);
         return ApiResponse.success("接单成功");
     }
+
+    @PostMapping("/bookOrder/confirm")
+    public ApiResponse<String> confirmBookOrder(@RequestBody Long orderId) {
+        boolean success = bookOrderService.confirmBookOrder(orderId);
+        return success ? ApiResponse.success("确认成功") : ApiResponse.error("确认失败");
+    }
+    @PostMapping("/bookOrder/recharge")
+    public ApiResponse<String> rechargeBookOrder(@RequestBody Long orderId,int amount,double price) {
+        boolean success = bookOrderService.rechargeBookOrder(orderId,amount,price);
+        return success ? ApiResponse.success("充值成功") : ApiResponse.error("充值失败");
+    }
+    @PostMapping("/bookOrder/reject")
+    public ApiResponse<String> rejectBookOrder(@RequestBody Long orderId, @RequestBody String rejectReason) {
+        boolean success = bookOrderService.rejectBookOrder(orderId, rejectReason);
+        return success ? ApiResponse.success("拒绝成功") : ApiResponse.error("拒绝失败");
+    }
+
 }

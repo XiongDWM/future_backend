@@ -2,6 +2,7 @@ package com.xiongdwm.future_backend.bo;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 import com.xiongdwm.future_backend.entity.Order;
 import com.xiongdwm.future_backend.entity.Order.UnitType;
@@ -17,6 +18,7 @@ public class FindingRequestFillDto implements Serializable {
     private double amount; // 数量
     private UnitType unitType;
 	private String description; // 描述，存游戏类型和段位，格式是 "gameType|rank"
+	private List<Long> collaboratorPalIds; // 协作打手id列表（可选）
 
 	public Long getRequestId() {
 		return requestId;
@@ -78,5 +80,11 @@ public class FindingRequestFillDto implements Serializable {
 	}
 	public void setDescription(String description) {
 		this.description = description;
+	}
+	public List<Long> getCollaboratorPalIds() {
+		return collaboratorPalIds;
+	}
+	public void setCollaboratorPalIds(List<Long> collaboratorPalIds) {
+		this.collaboratorPalIds = collaboratorPalIds;
 	}
 }

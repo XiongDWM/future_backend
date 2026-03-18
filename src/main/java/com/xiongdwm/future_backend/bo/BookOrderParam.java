@@ -1,6 +1,7 @@
 package com.xiongdwm.future_backend.bo;
 
 public record BookOrderParam(
+    Long id, // 更新时传入，创建时不传
     String customer,  // 客户称呼
     String customerId, // 微信号 
     String details, // 客户偏好，订单描述等
