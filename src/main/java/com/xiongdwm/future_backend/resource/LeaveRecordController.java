@@ -1,6 +1,5 @@
 package com.xiongdwm.future_backend.resource;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,15 +13,16 @@ import com.xiongdwm.future_backend.entity.LeaveRecord;
 import com.xiongdwm.future_backend.service.LeaveRecordService;
 import com.xiongdwm.future_backend.utils.security.JwtTokenProvider;
 
-import jakarta.annotation.Resource;
-
 @RestController
 public class LeaveRecordController {
 
-    @Autowired
-    private LeaveRecordService leaveRecordService;
-    @Resource
-    private JwtTokenProvider tokenProvider;
+    private final LeaveRecordService leaveRecordService;
+    private final JwtTokenProvider tokenProvider;
+
+    public LeaveRecordController(LeaveRecordService leaveRecordService, JwtTokenProvider tokenProvider) {
+        this.leaveRecordService = leaveRecordService;
+        this.tokenProvider = tokenProvider;
+    }
 
     @PostMapping("/leave/create")
     public ApiResponse<String> create(@RequestBody LeaveRecordParam record, @RequestHeader("Authorization") String token) {

@@ -1,7 +1,6 @@
 package com.xiongdwm.future_backend.service.impl;
 
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xiongdwm.future_backend.entity.RejectionInfo;
@@ -12,11 +11,14 @@ import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 
 @Service
 public class RejectionInfoServiceImpl implements RejectionInfoService {
-    @Autowired
-    private RejectionInfoRepository rejectionInfoRepository;
-    @Autowired
-    private GlobalEventBus eventBus;
+    private final RejectionInfoRepository rejectionInfoRepository;
+    private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.REJECTION_INFO;
+
+    public RejectionInfoServiceImpl(RejectionInfoRepository rejectionInfoRepository, GlobalEventBus eventBus) {
+        this.rejectionInfoRepository = rejectionInfoRepository;
+        this.eventBus = eventBus;
+    }
 
     @Override
     public boolean saveRejectionInfo(RejectionInfo rejectionInfo) {

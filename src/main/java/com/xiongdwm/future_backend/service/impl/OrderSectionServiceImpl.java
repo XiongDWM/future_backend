@@ -3,7 +3,6 @@ package com.xiongdwm.future_backend.service.impl;
 import java.util.Date;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -16,11 +15,14 @@ import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 
 @Service
 public class OrderSectionServiceImpl implements OrderSectionService {
-    @Autowired
-    private OrderSectionRepository orderSectionRepository;
-    @Autowired
-    private GlobalEventBus eventBus;
+    private final OrderSectionRepository orderSectionRepository;
+    private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.ORDER_SECTION;
+
+    public OrderSectionServiceImpl(OrderSectionRepository orderSectionRepository, GlobalEventBus eventBus) {
+        this.orderSectionRepository = orderSectionRepository;
+        this.eventBus = eventBus;
+    }
 
     @Override
     public boolean createOrderSection(OrderSection orderSection) {

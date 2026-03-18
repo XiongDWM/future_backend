@@ -5,7 +5,6 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,18 +21,21 @@ import com.xiongdwm.future_backend.service.OrderService;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventBus;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 
-import jakarta.annotation.Resource;
 import jakarta.persistence.criteria.Predicate;
 
 @Service
 public class BookOrderServiceImpl implements BookOrderService {
-    @Autowired
-    private BookOrderRepository bookOrderRepository;
-    @Resource
-    private OrderService orderService;
-    @Autowired
-    private GlobalEventBus eventBus;
+    private final BookOrderRepository bookOrderRepository;
+    private final OrderService orderService;
+    private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.BOOKING;
+
+    public BookOrderServiceImpl(BookOrderRepository bookOrderRepository, OrderService orderService,
+                                GlobalEventBus eventBus) {
+        this.bookOrderRepository = bookOrderRepository;
+        this.orderService = orderService;
+        this.eventBus = eventBus;
+    }
     
 
     @Override

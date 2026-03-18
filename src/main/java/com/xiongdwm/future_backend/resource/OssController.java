@@ -2,7 +2,6 @@ package com.xiongdwm.future_backend.resource;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,8 +24,11 @@ import reactor.core.publisher.Mono;
 @RestController
 @RequestMapping("/oss")
 public class OssController {
-    @Autowired
-    private FileLogService fileLogService;
+    private final FileLogService fileLogService;
+
+    public OssController(FileLogService fileLogService) {
+        this.fileLogService = fileLogService;
+    }
 
     @PostMapping("/upload")
     public Mono<ApiResponse<FileLog>> upload(@RequestPart("file") FilePart filePart) {

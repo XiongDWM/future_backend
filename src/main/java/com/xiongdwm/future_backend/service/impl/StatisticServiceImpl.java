@@ -19,21 +19,23 @@ import com.xiongdwm.future_backend.service.OrderSectionService;
 import com.xiongdwm.future_backend.service.StatisticService;
 import com.xiongdwm.future_backend.service.UserService;
 
-import jakarta.annotation.Resource;
-
 @Service
 public class StatisticServiceImpl implements StatisticService {
 
     private static final Logger log = LoggerFactory.getLogger(StatisticServiceImpl.class);
 
-    @Resource
-    private UserService userService;
-    @Resource
-    private PalOnlineSnapshotRepository snapshotRepository;
-    @Resource
-    private OrderRepository orderRepository;
-    @Resource
-    private OrderSectionService sectionService;
+    private final UserService userService;
+    private final PalOnlineSnapshotRepository snapshotRepository;
+    private final OrderRepository orderRepository;
+    private final OrderSectionService sectionService;
+
+    public StatisticServiceImpl(UserService userService, PalOnlineSnapshotRepository snapshotRepository,
+                                OrderRepository orderRepository, OrderSectionService sectionService) {
+        this.userService = userService;
+        this.snapshotRepository = snapshotRepository;
+        this.orderRepository = orderRepository;
+        this.sectionService = sectionService;
+    }
 
     @Override
     public OnlineCountStatistic getOnlineCountStatistic() {

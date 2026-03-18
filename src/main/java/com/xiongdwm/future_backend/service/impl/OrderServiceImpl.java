@@ -6,7 +6,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -33,21 +32,24 @@ import com.xiongdwm.future_backend.utils.exception.ServiceException;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventBus;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 
-import jakarta.annotation.Resource;
-
 @Service
 public class OrderServiceImpl implements OrderService {
-    @Autowired
-    private OrderRepository orderRepository;
-    @Resource
-    private UserService userService;
-    @Resource
-    private OrderSectionService sectionService;
-    @Resource
-    private RejectionInfoService rejectionInfoService;
-    @Autowired
-    private GlobalEventBus eventBus;
+    private final OrderRepository orderRepository;
+    private final UserService userService;
+    private final OrderSectionService sectionService;
+    private final RejectionInfoService rejectionInfoService;
+    private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.ORDER;
+
+    public OrderServiceImpl(OrderRepository orderRepository, UserService userService,
+                            OrderSectionService sectionService, RejectionInfoService rejectionInfoService,
+                            GlobalEventBus eventBus) {
+        this.orderRepository = orderRepository;
+        this.userService = userService;
+        this.sectionService = sectionService;
+        this.rejectionInfoService = rejectionInfoService;
+        this.eventBus = eventBus;
+    }
 
     @Override
     @Transactional

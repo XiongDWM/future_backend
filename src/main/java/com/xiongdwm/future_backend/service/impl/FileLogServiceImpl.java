@@ -9,7 +9,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
@@ -27,11 +26,14 @@ import reactor.core.publisher.Mono;
 
 @Service
 public class FileLogServiceImpl implements FileLogService {
-    @Autowired
-    private FileLogRepository fileLogRepository;
+    private final FileLogRepository fileLogRepository;
+    private final String uploadDir;
 
-    @Value("${file.upload.dir}")
-    private String uploadDir;
+    public FileLogServiceImpl(FileLogRepository fileLogRepository,
+                              @Value("${file.upload.dir}") String uploadDir) {
+        this.fileLogRepository = fileLogRepository;
+        this.uploadDir = uploadDir;
+    }
 
     @Override
     public Mono<FileLog> upload(FilePart filePart) {

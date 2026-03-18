@@ -1,6 +1,5 @@
 package com.xiongdwm.future_backend.resource;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,17 +14,19 @@ import com.xiongdwm.future_backend.entity.User;
 import com.xiongdwm.future_backend.service.BookOrderService;
 import com.xiongdwm.future_backend.utils.security.JwtTokenProvider;
 
-import jakarta.annotation.Resource;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 @RestController
 public class BookOrderController {
 
-    @Autowired
-    private BookOrderService bookOrderService;
-    @Resource
-    private JwtTokenProvider tokenProvider;
+    private final BookOrderService bookOrderService;
+    private final JwtTokenProvider tokenProvider;
+
+    public BookOrderController(BookOrderService bookOrderService, JwtTokenProvider tokenProvider) {
+        this.bookOrderService = bookOrderService;
+        this.tokenProvider = tokenProvider;
+    }
 
     /**
      * 

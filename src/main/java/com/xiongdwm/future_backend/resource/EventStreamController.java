@@ -3,7 +3,6 @@ package com.xiongdwm.future_backend.resource;
 import java.util.EnumSet;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,9 +17,11 @@ import reactor.core.publisher.Flux;
 @RestController
 public class EventStreamController {
     
-    @Autowired
-    @Qualifier("globalEventFlux")
-    private Flux<GlobalEventSpec> globalEventFlux;
+    private final Flux<GlobalEventSpec> globalEventFlux;
+
+    public EventStreamController(@Qualifier("globalEventFlux") Flux<GlobalEventSpec> globalEventFlux) {
+        this.globalEventFlux = globalEventFlux;
+    }
 
     @GetMapping(value = "/events/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<GlobalEventSpec> streamEvents(

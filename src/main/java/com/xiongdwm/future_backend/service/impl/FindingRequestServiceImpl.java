@@ -3,7 +3,6 @@ package com.xiongdwm.future_backend.service.impl;
 import java.util.Date;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xiongdwm.future_backend.bo.FindingRequestFillDto;
@@ -17,20 +16,23 @@ import com.xiongdwm.future_backend.utils.sse.GlobalEventBus;
 import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 import com.xiongdwm.future_backend.entity.User;
 
-import jakarta.annotation.Resource;
 import jakarta.transaction.Transactional;
 
 @Service
 public class FindingRequestServiceImpl implements FindingRequestService {
-    @Autowired
-    private FindingRequestRepository requestRepository;
-    @Resource
-    private OrderService orderService;
-    @Resource 
-    private UserService userService;
-    @Autowired
-    private GlobalEventBus eventBus;
+    private final FindingRequestRepository requestRepository;
+    private final OrderService orderService;
+    private final UserService userService;
+    private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.FINDING_REQUEST;
+
+    public FindingRequestServiceImpl(FindingRequestRepository requestRepository, OrderService orderService,
+                                     UserService userService, GlobalEventBus eventBus) {
+        this.requestRepository = requestRepository;
+        this.orderService = orderService;
+        this.userService = userService;
+        this.eventBus = eventBus;
+    }
 
 	@Override
 	public boolean submit(FindingRequest findingRequest) {

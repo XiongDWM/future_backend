@@ -10,15 +10,17 @@ import com.xiongdwm.future_backend.bo.ApiResponse;
 import com.xiongdwm.future_backend.bo.OnlineCountStatistic;
 import com.xiongdwm.future_backend.service.StatisticService;
 
-import jakarta.annotation.Resource;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 @RestController
 public class StatisticController {
 
-    @Resource
-    private StatisticService statisticService;
+    private final StatisticService statisticService;
+
+    public StatisticController(StatisticService statisticService) {
+        this.statisticService = statisticService;
+    }
 
     /** 在线打手统计：当前人数、日/周环比、7天每小时曲线数据 */
     @GetMapping("/statistic/online-count")

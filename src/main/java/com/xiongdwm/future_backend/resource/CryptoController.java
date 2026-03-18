@@ -8,7 +8,6 @@ import com.xiongdwm.future_backend.utils.ecc.CryptoSessionConfig;
 import com.xiongdwm.future_backend.utils.ecc.ECDHKeyGen;
 
 import java.util.logging.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,9 +22,12 @@ import java.util.UUID;
 @RestController
 public class CryptoController {
 
-    @Autowired
-    private CacheHandler cacheHandler;
+    private final CacheHandler cacheHandler;
     Logger logger = Logger.getLogger(CryptoController.class.getName());
+
+    public CryptoController(CacheHandler cacheHandler) {
+        this.cacheHandler = cacheHandler;
+    }
 
     /**
      * 单次握手接口

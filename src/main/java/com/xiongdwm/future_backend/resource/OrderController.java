@@ -23,8 +23,6 @@ import com.xiongdwm.future_backend.service.OrderService;
 import com.xiongdwm.future_backend.utils.JacksonUtil;
 import com.xiongdwm.future_backend.utils.security.JwtTokenProvider;
 
-import jakarta.annotation.Resource;
-
 import java.util.List;
 import java.util.Map;
 
@@ -36,14 +34,18 @@ import reactor.core.scheduler.Schedulers;
 @RestController
 public class OrderController {
 
-    @Resource
-    private OrderService orderService;
-    @Resource
-    private FindingRequestService findingRequestService;
-    @Resource
-    private OrderSectionService orderSectionService;
-    @Resource
-    private JwtTokenProvider tokenProvider;
+    private final OrderService orderService;
+    private final FindingRequestService findingRequestService;
+    private final OrderSectionService orderSectionService;
+    private final JwtTokenProvider tokenProvider;
+
+    public OrderController(OrderService orderService, FindingRequestService findingRequestService,
+                           OrderSectionService orderSectionService, JwtTokenProvider tokenProvider) {
+        this.orderService = orderService;
+        this.findingRequestService = findingRequestService;
+        this.orderSectionService = orderSectionService;
+        this.tokenProvider = tokenProvider;
+    }
 
     @PostMapping("/order/list")
     public Mono<ApiResponse<Page<OrderListItemDto>>> listOrders(@RequestBody PageableParam param,@RequestHeader(name="Authorization", required=false) String token) {

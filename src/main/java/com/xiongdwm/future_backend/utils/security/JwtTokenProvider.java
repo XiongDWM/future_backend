@@ -4,7 +4,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.Resource;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -23,8 +22,7 @@ import java.util.Date;
  */
 @Component
 public class JwtTokenProvider {
-    @Resource
-    UserService userService;
+    private final UserService userService;
 
     private final SecretKey key;
     private final long expirationMs;
@@ -34,9 +32,11 @@ public class JwtTokenProvider {
     private static final String DEV_ROLE = User.Role.ADMIN.name();
 
     public JwtTokenProvider(
+            UserService userService,
             @Value("${jwt.secret:FutureBackendDefaultSecret2026!@#$%^&*()ABCDE}") String secret,
             @Value("${jwt.expiration-ms:1800000}") long expirationMs,
             @Value("${project.dev:false}") boolean devMode) {
+        this.userService = userService;
         // 确保 secret 至少 32 字节 (256 位)
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         this.key = Keys.hmacShaKeyFor(keyBytes);

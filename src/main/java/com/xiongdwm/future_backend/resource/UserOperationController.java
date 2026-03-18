@@ -15,15 +15,17 @@ import com.xiongdwm.future_backend.bo.RegisterRequest;
 import com.xiongdwm.future_backend.entity.User;
 import com.xiongdwm.future_backend.service.UserService;
 
-import jakarta.annotation.Resource;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 @RestController
 public class UserOperationController {
 
-    @Resource
-    private UserService userService;
+    private final UserService userService;
+
+    public UserOperationController(UserService userService) {
+        this.userService = userService;
+    }
 
     /** 分页查询用户列表，支持按名称模糊搜索 + 按状态筛选 */
     @PostMapping("/user/list")

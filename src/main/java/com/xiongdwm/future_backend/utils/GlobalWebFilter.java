@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import javax.crypto.SecretKey;
 
 import org.reactivestreams.Publisher;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
@@ -66,10 +65,14 @@ public class GlobalWebFilter implements WebFilter {
             "/oss/upload"
     );
 
-    @Autowired
-    private CacheHandler cacheHandler;
-    @Value("${project.dev:false}")
-    private boolean devMode;
+    private final CacheHandler cacheHandler;
+    private final boolean devMode;
+
+    public GlobalWebFilter(CacheHandler cacheHandler,
+                           @Value("${project.dev:false}") boolean devMode) {
+        this.cacheHandler = cacheHandler;
+        this.devMode = devMode;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {

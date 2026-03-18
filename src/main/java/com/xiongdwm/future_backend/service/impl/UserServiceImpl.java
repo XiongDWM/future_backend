@@ -5,7 +5,6 @@ package com.xiongdwm.future_backend.service.impl;
 import java.util.Date;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,15 +25,19 @@ import jakarta.annotation.PostConstruct;
 
 @Service
 public class UserServiceImpl implements UserService {
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private LeaveRecordService leaveRecordService;
-    @Autowired
-    private UserActivityTracker activityTracker;
-    @Autowired
-    private GlobalEventBus eventBus;
+    private final UserRepository userRepository;
+    private final LeaveRecordService leaveRecordService;
+    private final UserActivityTracker activityTracker;
+    private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.USER; // 定义编译单元内主要操作的领域
+
+    public UserServiceImpl(UserRepository userRepository, LeaveRecordService leaveRecordService,
+                           UserActivityTracker activityTracker, GlobalEventBus eventBus) {
+        this.userRepository = userRepository;
+        this.leaveRecordService = leaveRecordService;
+        this.activityTracker = activityTracker;
+        this.eventBus = eventBus;
+    }
 
     @PostConstruct
     public void restoreOnlineUsers() {

@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -30,16 +29,20 @@ import jakarta.persistence.criteria.Predicate;
 @Service
 public class LeaveRecordServiceImpl implements LeaveRecordService {
 
-    @Autowired
-    private LeaveRecordRepository leaveRecordRepository;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private GlobalEventBus eventBus;
-    @Autowired
-    private TaskScheduler taskScheduler;
+    private final LeaveRecordRepository leaveRecordRepository;
+    private final UserRepository userRepository;
+    private final GlobalEventBus eventBus;
+    private final TaskScheduler taskScheduler;
     private final GlobalEventSpec.Domain domain = GlobalEventSpec.Domain.LEAVE_RECORD;
     private final Map<Long, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
+
+    public LeaveRecordServiceImpl(LeaveRecordRepository leaveRecordRepository, UserRepository userRepository,
+                                  GlobalEventBus eventBus, TaskScheduler taskScheduler) {
+        this.leaveRecordRepository = leaveRecordRepository;
+        this.userRepository = userRepository;
+        this.eventBus = eventBus;
+        this.taskScheduler = taskScheduler;
+    }
 
     @PostConstruct
     public void restoreScheduledTasks() {

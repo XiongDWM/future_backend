@@ -2,7 +2,6 @@ package com.xiongdwm.future_backend.resource;
 
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,12 +18,16 @@ import reactor.core.scheduler.Schedulers;
 
 @RestController
 public class AuthenticationController {
-    @Autowired
-    private UserService authenticationService;
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
-    @Autowired
-    private UserActivityTracker activityTracker;
+    private final UserService authenticationService;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final UserActivityTracker activityTracker;
+
+    public AuthenticationController(UserService authenticationService, JwtTokenProvider jwtTokenProvider,
+                                    UserActivityTracker activityTracker) {
+        this.authenticationService = authenticationService;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.activityTracker = activityTracker;
+    }
 
     @PostMapping("/user/login")
     public Mono<ApiResponse<String>> login(@RequestBody Map<String, String> body) {
