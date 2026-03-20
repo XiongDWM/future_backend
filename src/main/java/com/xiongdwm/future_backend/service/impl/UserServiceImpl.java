@@ -5,6 +5,8 @@ package com.xiongdwm.future_backend.service.impl;
 import java.util.Date;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
@@ -30,6 +32,7 @@ public class UserServiceImpl implements UserService {
     private final UserActivityTracker activityTracker;
     private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.USER; // 定义编译单元内主要操作的领域
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
     public UserServiceImpl(UserRepository userRepository, LeaveRecordService leaveRecordService,
                            UserActivityTracker activityTracker, GlobalEventBus eventBus) {
@@ -48,7 +51,6 @@ public class UserServiceImpl implements UserService {
                 activityTracker.touch(user.getId());
             }
         }
-        System.out.println("============restore online users complete================>>>>");
     }
 
     @Override
@@ -56,7 +58,7 @@ public class UserServiceImpl implements UserService {
         var action=GlobalEventSpec.Action.UPDATE;
         var user=userRepository.findByUsername(username).orElseThrow(()->new AuthenticationFailException("用户名或密码错误"));
         if(!user.getPassword().equals(password))throw new AuthenticationFailException("用户名或密码错误");
-        System.out.println("========authenticate user: "+user.getUsername()+"=========");
+        log.info("authenticate user: "+user.getUsername());
         if(user.getRole()==User.Role.PALWORLD)throw new AuthenticationFailException("打手账号无权限登录平台");
         if(user.getStatus()==User.Status.ON_LEAVE) {
             leaveRecordService.cancelLeaveByUser(user);

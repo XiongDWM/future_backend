@@ -3,6 +3,9 @@ package com.xiongdwm.future_backend.utils.ecc;
 import com.xiongdwm.future_backend.utils.cache.CacheHandler;
 import com.xiongdwm.future_backend.utils.cache.LRUCache;
 import jakarta.annotation.PostConstruct;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 
 import javax.crypto.SecretKey;
@@ -15,6 +18,8 @@ public class CryptoSessionConfig {
 
     private final CacheHandler cacheHandler;
 
+    private static final Logger log = LoggerFactory.getLogger(CryptoSessionConfig.class);
+
     public CryptoSessionConfig(CacheHandler cacheHandler) {
         this.cacheHandler = cacheHandler;
     }
@@ -23,6 +28,6 @@ public class CryptoSessionConfig {
     public void initCryptoCaches() {
         cacheHandler.addCache(CACHE_KM,
                 new LRUCache<String, SecretKey>(512, 15 * 60 * 1000L));
-                System.out.println("============cache km initiate================>>>>");
+                log.info("cache km initiate");
     }
 }

@@ -52,9 +52,9 @@ public class User {
     private Date lastPaidDate; // 上次发工资（或结算）日期
     @Column 
     private String realName; // 真实姓名
-    @Column
+    @Column(columnDefinition = "boolean default false")
     private boolean lastLogoutAuto=false; // 上次登出是否为自动登出（可能是掉线或者直接关闭程序,默认是正常登出）
-    @Column
+    @Column(columnDefinition = "boolean default false")
     private boolean deleted=false; // 软删除标志
 
 

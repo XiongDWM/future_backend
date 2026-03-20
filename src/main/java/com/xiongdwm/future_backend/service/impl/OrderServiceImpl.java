@@ -2,7 +2,6 @@ package com.xiongdwm.future_backend.service.impl;
 
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -104,18 +103,15 @@ public class OrderServiceImpl implements OrderService {
                 
                 Predicate withinTwentyFourHours = cb.greaterThanOrEqualTo(root.get("issueDate"), twentyFourHoursAgo);
                 
-                Predicate isSecondHand = cb.or(
-                    cb.equal(root.get("type"), Type.SECOND_HAND),
-                    cb.equal(root.get("type"), Type.SECOND_HAND_G)
-                );
-                Predicate secondHandStatusMatch = cb.or(
-                    cb.equal(root.get("secondHandStatus"), Order.SecondHandStatus.THIRD_PARTY_TAKEN_PROCESS_DONE),
-                    cb.equal(root.get("secondHandStatus"), Order.SecondHandStatus.THIRD_PARTY_SETTLEMENT_PULL)
-                );
-                Predicate secondHandCondition = cb.and(isSecondHand, secondHandStatusMatch);
-                
-                // 用 OR 连接两个大条件
-                predicates.add(cb.or(withinTwentyFourHours, secondHandCondition));
+                if (userId == null) {
+                    Predicate secondHandStatusMatch = cb.or(
+                        cb.equal(root.get("secondHandStatus"), Order.SecondHandStatus.THIRD_PARTY_TAKEN_PROCESS_DONE),
+                        cb.equal(root.get("secondHandStatus"), Order.SecondHandStatus.THIRD_PARTY_SETTLEMENT_PULL)
+                    );
+                    predicates.add(cb.or(withinTwentyFourHours, secondHandStatusMatch));
+                } else {
+                    predicates.add(withinTwentyFourHours);
+                }
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -128,7 +124,6 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public boolean workWork(long palId, String orderId,String picStart) {
         var pal = userService.getUserById(palId);
-        System.out.println(pal);
         if(pal==null||(pal.getStatus()!=User.Status.ONLINE&&pal.getStatus()!=User.Status.ACTIVE&&pal.getStatus()!=User.Status.PREPARE))throw new ServiceException("状态异常");
         var order = orderRepository.findById(orderId).orElse(null);
         if(order==null||!order.getType().isSelf())throw new ServiceException("订单不存在");
@@ -188,7 +183,6 @@ public class OrderServiceImpl implements OrderService {
         
         if (order == null) throw new ServiceException("订单不存在");
         if(order.getStatus()==Order.Status.CANCELLED)throw new ServiceException("订单已取消");
-        System.out.println(order.getType());
         // 二手单第一次必须上传截图，否则不允许续单
         boolean isSecondHand = (order.getType() == Order.Type.SECOND_HAND || order.getType() == Order.Type.SECOND_HAND_G)&&order.getSecondHandStatus()==null;
         if (isSecondHand && (additionalPic == null || additionalPic.isBlank())) throw new ServiceException("二手单续单需要上传附加截图");

@@ -49,7 +49,6 @@ public class OssController {
     public Flux<DataBuffer> preview(@PathVariable("fileId") String fileId,
                                     org.springframework.http.server.reactive.ServerHttpResponse response) {
         String subfix = fileLogService.getFileSubfix(fileId);
-        System.out.println("Previewing file " + fileId + " with subfix " + subfix);
         MediaType mediaType = switch (subfix.toLowerCase()) {
             case ".png"  -> MediaType.IMAGE_PNG;
             case ".jpg", ".jpeg" -> MediaType.IMAGE_JPEG;

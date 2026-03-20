@@ -21,6 +21,7 @@ public class AuthenticationController {
     private final UserService authenticationService;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserActivityTracker activityTracker;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthenticationController.class);
 
     public AuthenticationController(UserService authenticationService, JwtTokenProvider jwtTokenProvider,
                                     UserActivityTracker activityTracker) {
@@ -67,7 +68,7 @@ public class AuthenticationController {
 
     @GetMapping("/user/heartbeat")
     public Mono<ApiResponse<String>> heartbeat() {
-        System.out.println("===============heartbeat===============>>");
+        log.info("===============heartbeat===============>>");
         return Mono.just(ApiResponse.success("boomboom"));
     }
 

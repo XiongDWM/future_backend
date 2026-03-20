@@ -16,15 +16,15 @@ public class GlobalExceptionHandler {
     
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-        @ExceptionHandler(ServiceException.class)
+    @ExceptionHandler(ServiceException.class)
     public ApiResponse<String> handleServiceException(ServiceException e) {
-        logger.error("Service Exception: ", e.getMessage(), e);
+        logger.error("Service Exception: {}", e.getLocalizedMessage());
         return ApiResponse.bussiness_error(e.getLocalizedMessage());
     }
 
     @ExceptionHandler(AuthenticationFailException.class)
     public ApiResponse<String> handleUnAuthorizedException(AuthenticationFailException e) {
-        logger.error("Unauthorized Exception: ", e.getLocalizedMessage());
+        logger.error("Unauthorized Exception: {}", e.getLocalizedMessage());
         return ApiResponse.unauthorized();
     }
     

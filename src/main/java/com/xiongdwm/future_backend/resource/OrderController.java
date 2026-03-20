@@ -70,7 +70,6 @@ public class OrderController {
     public Mono<ApiResponse<String>> cancelOrder(@RequestBody Map<String, String> orderId) {
         return Mono.fromCallable(() -> {
             var id = orderId.get("orderId");
-            System.out.println("取消订单: " + id);
             var success = orderService.cancelOrder(id);
             return success ? ApiResponse.success("订单已取消") : ApiResponse.<String>error("订单取消失败");
         }).subscribeOn(Schedulers.boundedElastic());

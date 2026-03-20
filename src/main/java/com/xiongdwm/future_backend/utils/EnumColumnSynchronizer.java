@@ -35,7 +35,7 @@ public class EnumColumnSynchronizer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        System.out.println("=====EnumColumnSynchronizer run=====");
+        log.info("[EnumSync] Starting MySQL ENUM column synchronization...");
         var metamodel = emf.getMetamodel();
 
         try (Connection conn = dataSource.getConnection()) {
@@ -57,7 +57,7 @@ public class EnumColumnSynchronizer implements ApplicationRunner {
                     syncEnumColumn(conn, catalog, tableName, columnName, enumClass);
                 }
             }
-            System.out.println("[EnumSync] MySQL ENUM 列同步检查完成");
+            log.info("[EnumSync] MySQL ENUM synchronization completed successfully");
         } catch (Exception e) {
             log.error("[EnumSync] MySQL ENUM 列同步失败", e);
         }
