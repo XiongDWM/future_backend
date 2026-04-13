@@ -1,5 +1,7 @@
 package com.xiongdwm.future_backend.resource;
 
+import java.util.Map;
+
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -72,25 +74,25 @@ public class BookOrderController {
      * @return 是否成功
      */
     @PostMapping("/bookOrder/starting")
-    public ApiResponse<String> startBookOrder(@RequestBody Long orderId) {
+    public ApiResponse<String> startBookOrder(@RequestBody Map<String,Long> body) {
+        var orderId = body.get("orderId");
         bookOrderService.startBookOrder(orderId);
         return ApiResponse.success("接单成功");
     }
 
-    @PostMapping("/bookOrder/confirm")
-    public ApiResponse<String> confirmBookOrder(@RequestBody Long orderId) {
-        boolean success = bookOrderService.confirmBookOrder(orderId);
-        return success ? ApiResponse.success("确认成功") : ApiResponse.error("确认失败");
+    @PostMapping("/bookOrder/audit")
+    public ApiResponse<String> auditBookOrder(@RequestBody Map<String, Object> body) {
+        Long id = Long.valueOf(body.get("id").toString());
+        Boolean confirm = (Boolean) body.get("confirm");
+        String rejectReason = body.containsKey("rejectReason") ? (String) body.get("rejectReason") : "";
+        boolean success = bookOrderService.auditBookOrder(id, confirm, rejectReason);
+        return success ? ApiResponse.success("操作成功") : ApiResponse.error("操作失败");
     }
+
     @PostMapping("/bookOrder/recharge")
     public ApiResponse<String> rechargeBookOrder(@RequestBody Long orderId,int amount,double price) {
         boolean success = bookOrderService.rechargeBookOrder(orderId,amount,price);
         return success ? ApiResponse.success("充值成功") : ApiResponse.error("充值失败");
-    }
-    @PostMapping("/bookOrder/reject")
-    public ApiResponse<String> rejectBookOrder(@RequestBody Long orderId, @RequestBody String rejectReason) {
-        boolean success = bookOrderService.rejectBookOrder(orderId, rejectReason);
-        return success ? ApiResponse.success("拒绝成功") : ApiResponse.error("拒绝失败");
     }
 
 }

@@ -7,7 +7,9 @@ public record GlobalEventSpec(
     boolean update, 
     Domain domain, 
     Action action,
-    Serializable resourceId
+    Serializable resourceId,
+    Long studioId,
+    boolean broadcast
 ) {
     public enum Domain{
         USER("用户"),
@@ -18,7 +20,9 @@ public record GlobalEventSpec(
         REJECTION_INFO("拒绝信息"),
         FINDING_REQUEST("找单"),
         ACCOUNT_RENTING("租账号"),
-        LEAVE_RECORD("休假记录");
+        LEAVE_RECORD("休假记录"),
+        THIRD_PARTY_LISTING("甩单"),
+        CHAT("聊天");
 
         private final String label;
         private Domain(String label) {

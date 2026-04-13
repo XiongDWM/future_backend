@@ -45,16 +45,24 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, null);
+    }
+
+    public String generateToken(Long userId, String username, String role, Long studioId) {
         if (devMode) {
             return "DEV_TOKEN";
         }
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
-                .claim("role", role)
+                .claim("role", role);
+        if (studioId != null) {
+            builder.claim("studioId", studioId);
+        }
+        return builder
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -137,6 +145,29 @@ public class JwtTokenProvider {
         return claims != null ? claims.get("role", String.class) : null;
     }
 
+    public Long getStudioId(Claims claims) {
+        if (claims == null) return null;
+        return claims.get("studioId", Long.class);
+    }
+
+    public Long getStudioIdFromRawToken(String rawAuthorization) {
+        if (devMode) return null;
+        if (rawAuthorization == null || rawAuthorization.isBlank()) return null;
+        String token = rawAuthorization.startsWith("Bearer ")
+                ? rawAuthorization.substring(7) : rawAuthorization;
+        Claims claims = parseToken(token);
+        return claims != null ? claims.get("studioId", Long.class) : null;
+    }
+
+    public String getUsernameFromRawToken(String rawAuthorization) {
+        if (devMode) return DEV_USERNAME;
+        if (rawAuthorization == null || rawAuthorization.isBlank()) return null;
+        String token = rawAuthorization.startsWith("Bearer ")
+                ? rawAuthorization.substring(7) : rawAuthorization;
+        Claims claims = parseToken(token);
+        return claims != null ? claims.get("username", String.class) : null;
+    }
+
     // 判断 token 是否需要续期：如果 token 已过半生命周期，则建议续期
     public boolean shouldRenew(Claims claims) {
         if (claims == null) return false;
@@ -153,6 +184,7 @@ public class JwtTokenProvider {
         String userId = claims.getSubject();
         String username = claims.get("username", String.class);
         String role = claims.get("role", String.class);
-        return generateToken(Long.parseLong(userId), username, role);
+        Long studioId = claims.get("studioId", Long.class);
+        return generateToken(Long.parseLong(userId), username, role, studioId);
     }
 }

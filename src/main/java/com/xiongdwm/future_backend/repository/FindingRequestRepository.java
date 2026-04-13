@@ -18,4 +18,6 @@ public interface FindingRequestRepository extends JpaRepository<FindingRequest, 
 
     @EntityGraph(attributePaths = {"palworld", "order"})
     List<FindingRequest> findByPalworldAndRequestedAtAfterOrderByRequestedAtDesc(User palworld, Date since);
+
+    List<FindingRequest> findByOrder_OrderId(String orderId);
 }

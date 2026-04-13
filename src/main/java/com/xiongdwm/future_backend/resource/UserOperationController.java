@@ -7,13 +7,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xiongdwm.future_backend.bo.ApiResponse;
 import com.xiongdwm.future_backend.bo.PageableParam;
 import com.xiongdwm.future_backend.bo.RegisterRequest;
 import com.xiongdwm.future_backend.entity.User;
+import com.xiongdwm.future_backend.service.StudioService;
 import com.xiongdwm.future_backend.service.UserService;
+import com.xiongdwm.future_backend.utils.security.JwtTokenProvider;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -22,9 +25,14 @@ import reactor.core.scheduler.Schedulers;
 public class UserOperationController {
 
     private final UserService userService;
+    private final StudioService studioService;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    public UserOperationController(UserService userService) {
+    public UserOperationController(UserService userService, StudioService studioService,
+                                   JwtTokenProvider jwtTokenProvider) {
         this.userService = userService;
+        this.studioService = studioService;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     /** 分页查询用户列表，支持按名称模糊搜索 + 按状态筛选 */
@@ -63,15 +71,23 @@ public class UserOperationController {
     }
 
     @PostMapping("/user/register")
-    public Mono<ApiResponse<String>> register(@RequestBody RegisterRequest user) {
+    public Mono<ApiResponse<String>> register(@RequestBody RegisterRequest user,
+                                              @RequestHeader(name = "Authorization") String token) {
         var userEntity =new User();
         userEntity.setUsername(user.getUsername());
         userEntity.setPassword(user.getPassword());
         userEntity.setRole(user.getRole());
         userEntity.setIdentity(user.getIdentity());
         userEntity.setRealName(user.getRealName());
+        Long studioId = jwtTokenProvider.getStudioIdFromRawToken(token);
         return Mono.fromCallable(() -> {
+            if (studioService.isUsernameTaken(userEntity.getUsername())) {
+                return ApiResponse.<String>error("用户名已被占用");
+            }
             var success = userService.regist(userEntity);
+            if (success && studioId != null) {
+                studioService.addUserToStudio(userEntity.getUsername(), studioId);
+            }
             return success ? ApiResponse.success("注册成功") : ApiResponse.<String>error("注册失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -93,4 +109,29 @@ public class UserOperationController {
             return success ? ApiResponse.success("状态已更新") : ApiResponse.<String>error("更新失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
+
+    // 结算收入
+    @PostMapping("/user/income-settlement")
+    public Mono<ApiResponse<String>> settleIncome(@RequestBody Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            Long userId = Long.valueOf(body.get("userId"));
+            var success = userService.settleIncome(userId);
+            return success ? ApiResponse.success("收入已结算") : ApiResponse.<String>error("结算失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+
+    }
+
+    @PostMapping("/user/delete")
+    public Mono<ApiResponse<String>> deleteUser(@RequestBody Map<String, String> body,
+                                                @RequestHeader(name = "Authorization") String token) {
+        return Mono.fromCallable(() -> {
+            var operator =jwtTokenProvider.getUserIdFromRawToken(token);
+            var operatorUser = userService.getUserById(Long.valueOf(operator));
+            if(operatorUser.getRole() != User.Role.ADMIN) return ApiResponse.<String>error("无权限操作");
+            Long userId = Long.valueOf(body.get("userId"));
+            var success = userService.deleteUser(userId);
+            return success ? ApiResponse.success("用户已删除") : ApiResponse.<String>error("删除失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
 }

@@ -22,6 +22,8 @@ import com.xiongdwm.future_backend.entity.OrderSection;
 import com.xiongdwm.future_backend.entity.RejectionInfo;
 import com.xiongdwm.future_backend.entity.User;
 import com.xiongdwm.future_backend.entity.Order.Type;
+import com.xiongdwm.future_backend.repository.BookOrderRepository;
+import com.xiongdwm.future_backend.repository.FindingRequestRepository;
 import com.xiongdwm.future_backend.repository.OrderRepository;
 import com.xiongdwm.future_backend.service.OrderSectionService;
 import com.xiongdwm.future_backend.service.OrderService;
@@ -34,16 +36,22 @@ import com.xiongdwm.future_backend.utils.sse.GlobalEventSpec;
 @Service
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
+    private final BookOrderRepository bookOrderRepository;
+    private final FindingRequestRepository findingRequestRepository;
     private final UserService userService;
     private final OrderSectionService sectionService;
     private final RejectionInfoService rejectionInfoService;
     private final GlobalEventBus eventBus;
     private final GlobalEventSpec.Domain domain=GlobalEventSpec.Domain.ORDER;
 
-    public OrderServiceImpl(OrderRepository orderRepository, UserService userService,
+    public OrderServiceImpl(OrderRepository orderRepository, BookOrderRepository bookOrderRepository,
+                            FindingRequestRepository findingRequestRepository,
+                            UserService userService,
                             OrderSectionService sectionService, RejectionInfoService rejectionInfoService,
                             GlobalEventBus eventBus) {
         this.orderRepository = orderRepository;
+        this.bookOrderRepository = bookOrderRepository;
+        this.findingRequestRepository = findingRequestRepository;
         this.userService = userService;
         this.sectionService = sectionService;
         this.rejectionInfoService = rejectionInfoService;
@@ -122,20 +130,24 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public boolean workWork(long palId, String orderId,String picStart) {
+    public Order workWork(long palId, String orderId,String picStart) {
         var pal = userService.getUserById(palId);
         if(pal==null||(pal.getStatus()!=User.Status.ONLINE&&pal.getStatus()!=User.Status.ACTIVE&&pal.getStatus()!=User.Status.PREPARE))throw new ServiceException("状态异常");
         var order = orderRepository.findById(orderId).orElse(null);
+        boolean isSecondHand = (order.getType() == Order.Type.SECOND_HAND || order.getType() == Order.Type.SECOND_HAND_G)&&order.getSecondHandStatus()==null;
         if(order==null||!order.getType().isSelf())throw new ServiceException("订单不存在");
         if(order.getStatus()==Order.Status.CANCELLED)throw new ServiceException("订单已取消");
         order.setStatus(Order.Status.IN_PROGRESS);
         order.setPicStart(picStart);
-        var orderSuccess=orderRepository.saveAndFlush(order)!=null;
+        orderRepository.saveAndFlush(order);
         var action=GlobalEventSpec.Action.UPDATE;
         eventBus.emitAfterCommit(domain, action, action.isFetchable(), orderId);
+        if (isSecondHand) {
+            eventBus.emitAfterCommit(GlobalEventSpec.Domain.SECOND_HAND, GlobalEventSpec.Action.CREATE, true, orderId);
+        }
         // set pal status to busy
         pal.setStatus(User.Status.BUSY);
-        var userSuccess=userService.updateUser(pal);
+        userService.updateUser(pal);
         // create first order section
         var section = new OrderSection();
         section.setOrder(order);
@@ -147,8 +159,8 @@ public class OrderServiceImpl implements OrderService {
         // 预计结束时间=当前时间+amount*unitType折算成的小时
         long durationMs = (long) (order.getAmount() * order.getUnitType().getMultiplier() * 60 * 60 * 1000);
         section.setWillEndAt(new Date(System.currentTimeMillis() + durationMs));
-        var sectionSuccess=sectionService.createOrderSection(section);
-        return orderSuccess&&userSuccess&&sectionSuccess;
+        sectionService.createOrderSection(section);
+        return order;
     }
 
     @Override
@@ -178,7 +190,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public boolean continueOrder(String orderId, double price, double amount, Order.UnitType unitType,String additionalPic,String continuePic) {
+    public Order continueOrder(String orderId, double price, double amount, Order.UnitType unitType,String additionalPic,String continuePic) {
         var order = orderRepository.findById(orderId).orElse(null);
         
         if (order == null) throw new ServiceException("订单不存在");
@@ -236,7 +248,8 @@ public class OrderServiceImpl implements OrderService {
         // 计算预计结束时间: amount * unitType.multiplier 折算成小时
         long durationMs = (long) (amount * unitType.getMultiplier() * 60 * 60 * 1000);
         section.setWillEndAt(new Date(lastEndTime.getTime() + durationMs));
-        return sectionService.createOrderSection(section);
+        sectionService.createOrderSection(section);
+        return order;
     }
 
 	@Override
@@ -260,7 +273,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public Order addCollaborator(String parentOrderId, Long palId) {
+    public Order addCollaborator(String parentOrderId, Long palId,double slice) {
         var parentOrder = orderRepository.findById(parentOrderId).orElse(null);
         if (parentOrder == null) throw new ServiceException("主工单不存在");
         if (parentOrder.getType() == Order.Type.SUB_ORDER) throw new ServiceException("子单不能再添加协作者");
@@ -292,7 +305,8 @@ public class OrderServiceImpl implements OrderService {
         subOrder.setRankInfo(parentOrder.getRankInfo());
         subOrder.setAmount(parentOrder.getAmount());
         subOrder.setUnitType(parentOrder.getUnitType());
-        subOrder.setLowIncome(parentOrder.getLowIncome());
+        slice=slice>=0d?slice:parentOrder.getAmount();
+        subOrder.setLowIncome(slice);
         subOrder.setIssueDate(new Date());
         subOrder.setUserId(palId);
         subOrder.setPalworld(pal);
@@ -309,7 +323,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public boolean closeOrder(OrderCloseDto dto) {
+    public Order closeOrder(OrderCloseDto dto) {
         var order = orderRepository.findById(dto.getOrderId()).orElse(null);
         if (order == null) throw new ServiceException("订单不存在");
         var user = userService.getUserById(order.getUserId());
@@ -317,12 +331,30 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() != Order.Status.IN_PROGRESS) {
             throw new ServiceException("订单状态不允许关闭");
         }
+        Date now = new Date();
+        if(order.getType()==Order.Type.BOOKED){
+            var bookOrderId = order.getFromBookOrder();
+            if (bookOrderId != null) {
+                var bookOrder = bookOrderRepository.findById(bookOrderId).orElse(null);
+                if (bookOrder != null && order.getIssueDate() != null) {
+                    long spentMs = Math.max(0L, now.getTime() - order.getIssueDate().getTime());
+                    double spentInHours = spentMs / (60d * 60d * 1000d);
+                    double spentRounded = Math.round(spentInHours * 100.0) / 100.0;
+                    double remaining = Math.round(Math.max(0d, bookOrder.getRemaining() - spentRounded) * 100.0) / 100.0;
+                    bookOrder.setRemaining(remaining);
+                    bookOrder.setLastSettleTime(now.getTime());
+                    bookOrderRepository.saveAndFlush(bookOrder);
+                    var action = GlobalEventSpec.Action.UPDATE;
+                    eventBus.emitAfterCommit(GlobalEventSpec.Domain.BOOKING, action, action.isFetchable(), bookOrder.getId());
+                }
+            }
+        }
         var isSecondHand=order.getSecondHandStatus()==null&&(order.getType()==Order.Type.SECOND_HAND||order.getType()==Order.Type.SECOND_HAND_G);
         order.setStatus(Order.Status.COMPLETED);
         if(isSecondHand){
             order.setSecondHandStatus(Order.SecondHandStatus.THIRD_PARTY_TAKEN_PROCESS_DONE);
         }
-        order.setEndAt(new Date());
+        order.setEndAt(now);
         if(order.getPicEnd()==null)order.setPicEnd(dto.getPicString());
         orderRepository.saveAndFlush(order);
         var action=GlobalEventSpec.Action.UPDATE;
@@ -336,7 +368,7 @@ public class OrderServiceImpl implements OrderService {
         user.setStatus(User.Status.ONLINE);
         userService.updateUser(user);
 
-        return true;
+        return order;
     }
 
     @Override
@@ -396,6 +428,19 @@ public class OrderServiceImpl implements OrderService {
         return true;
     }
 
-    
-    
+    @Override
+    @Transactional
+    public boolean deleteOrder(String orderId) {
+        if (!orderRepository.existsById(orderId)) return false;
+        // 先删除关联的 FindingRequest（FK: finding_request.order_id → orders.order_id）
+        findingRequestRepository.findByOrder_OrderId(orderId)
+                                .forEach(findingRequestRepository::delete);
+        // 删除订单（CascadeType.ALL 自动级联删除 orderSections 和 subOrders）
+        orderRepository.deleteById(orderId);
+        eventBus.emitAfterCommit(domain, GlobalEventSpec.Action.DELETE, false, orderId);
+        return true;
+    }
+
+
 }
+

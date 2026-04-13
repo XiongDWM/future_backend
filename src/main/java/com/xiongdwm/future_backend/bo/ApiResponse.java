@@ -63,6 +63,10 @@ public class ApiResponse<T>{
         return new ApiResponse<>(ApiResponseCode.UNAUTHORIZED.getMessage(), ApiResponseCode.UNAUTHORIZED.getCode(), false);
     }
 
+    public static ApiResponse<String> unauthorized(String message){
+        return new ApiResponse<>(message, ApiResponseCode.UNAUTHORIZED.getCode(), false);
+    }
+
     public T getData() {
         return data;
     }

@@ -104,13 +104,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Page<User> listUsers(int page, int size) {
-        Page<User> users=userRepository.findAll(PageRequest.of(page-1, size));
-        return users;
+        Specification<User> spec = (root, query, cb) -> cb.isFalse(root.get("deleted"));
+        return userRepository.findAll(spec, PageRequest.of(page - 1, size));
     }
 
     @Override
     public Page<User> listUsers(int page, int size, String username, User.Status status) {
-        Specification<User> spec = (root, query, cb) -> cb.conjunction();
+        Specification<User> spec = (root, query, cb) -> cb.isFalse(root.get("deleted"));
         if (username != null && !username.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.like(root.get("username"), "%" + username.trim() + "%"));
         }
@@ -132,7 +132,11 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<User> listAllPalworld() {
         Specification<User> spec = (Specification<User>) (root, query, cb) ->
-            cb.equal(root.get("role"), User.Role.PALWORLD);
+            cb.and(
+                cb.equal(root.get("role"), User.Role.PALWORLD),
+                cb.isFalse(root.get("deleted")),
+                root.get("status").in(User.Status.ACTIVE, User.Status.ONLINE)
+            );
         return userRepository.findAll(spec);
     }
 
@@ -170,8 +174,11 @@ public class UserServiceImpl implements UserService {
         if(user==null)return false;
         if(user.getStatus()==User.Status.OFFLINE)throw new ServiceException("用户已离线"); 
         user.setStatus(User.Status.OFFLINE);
+        user.setLastLogoutAuto(false);
         user.setLastLogout(new Date());
-        return updateUser(user);
+        boolean updated = updateUser(user);
+        activityTracker.remove(userId);
+        return updated;
     }
 
     @Override
@@ -179,10 +186,34 @@ public class UserServiceImpl implements UserService {
         var user=userRepository.findById(userId).orElse(null);
         if(user==null)return false;
         if(user.getStatus()==User.Status.BUSY)return true;
-        if(user.getStatus()==User.Status.OFFLINE)throw new ServiceException("用户已离线"); 
+        if(user.getStatus()==User.Status.OFFLINE)return true;
         user.setStatus(User.Status.OFFLINE);
+        user.setLastLogoutAuto(true);
         user.setLastLogout(new Date());
+        var saved = userRepository.saveAndFlush(user);
+        // autoLogout 由 LRU 缓存驱逐线程触发，无 HTTP 请求上下文，
+        // TenantContext.getCurrentStudioId() 为 null，必须用 broadcast=true
+        eventBus.emit(domain, GlobalEventSpec.Action.UPDATE, true, user.getId(), true);
+        activityTracker.remove(userId);
+        return saved!=null;
+    }
+
+    @Override
+    public boolean settleIncome(Long userId) {
+        var user=userRepository.findById(userId).orElse(null);
+        if(user==null)return false;
+        user.setLastPaidDate(new Date());
         return updateUser(user);
+    }
+
+    @Override
+    public boolean deleteUser(Long userId) {
+        var user = userRepository.findById(userId).orElse(null);
+        if (user == null) return false;
+        user.setStatus(User.Status.INACTIVE); // 软删除：标记为不可用但不从数据库删除
+        user.setDeleted(true); // 软删除标志
+        return updateUser(user);
+        
     }
 
 

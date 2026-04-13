@@ -35,12 +35,8 @@ public class FindingRequestServiceImpl implements FindingRequestService {
     }
 
 	@Override
-	public boolean submit(FindingRequest findingRequest) {
-        // 确保 palworld 是受管实体（客户端可能只传了 id）
-        // if (findingRequest.getPalworld() != null && findingRequest.getPalworld().getId() != null) {
-        //     var user = userService.getUserById(findingRequest.getPalworld().getId());
-        //     findingRequest.setPalworld(user);
-        // }
+        @Transactional
+	public boolean submit(FindingRequest findingRequest, Long studioId) {
         findingRequest.setRequestedAt(new Date());
         findingRequest.setFulfilled(false);
         var saved=requestRepository.saveAndFlush(findingRequest);
@@ -49,7 +45,7 @@ public class FindingRequestServiceImpl implements FindingRequestService {
         var user=userService.getUserById(userId);
         user.setStatus(User.Status.ACTIVE);
         userService.updateUser(user);
-        eventBus.emit(domain, GlobalEventSpec.Action.CREATE, true,saved.getId());
+        eventBus.emitAfterCommitTo(domain, GlobalEventSpec.Action.CREATE, true, saved.getId(), studioId);
         return saved!=null;
 	}
 
@@ -60,13 +56,18 @@ public class FindingRequestServiceImpl implements FindingRequestService {
         if(request==null)throw new ServiceException("找单请求不存在");
         if(request.isFulfilled()==null)throw new ServiceException("找单请求已被取消");
         if(request.isFulfilled())throw new ServiceException("找单请求已完成");
+        var collaborator=findingRequestDto.getCollaboratorPalIds();
+        if(collaborator!=null&&collaborator.contains(request.getPalworld().getId()))throw new ServiceException("打手不能同时是订单的发布者和协作者");
+        var income=findingRequestDto.getLowIncome(); 
+        if(collaborator!=null&&collaborator.size()>0)findingRequestDto.setLowIncome(income/(collaborator.size()+1)); // 协作打手分摊底价
         var order=orderService.createOrderFromFindingRequest(findingRequestDto);
         if(null==order)throw new ServiceException("创建订单失败");
 
         // 为协作打手创建子单
-        if (findingRequestDto.getCollaboratorPalIds() != null) {
+        if (collaborator != null) {
+            var slice = income/(collaborator.size()+1);
             for (Long collabPalId : findingRequestDto.getCollaboratorPalIds()) {
-                orderService.addCollaborator(order.getOrderId(), collabPalId);
+                orderService.addCollaborator(order.getOrderId(), collabPalId,slice);
             }
         }
 
@@ -88,12 +89,13 @@ public class FindingRequestServiceImpl implements FindingRequestService {
 	}
 
 	@Override
+        @Transactional
 	public boolean cancel(Long requestId) {
 		var request = requestRepository.findById(requestId).orElse(null);
 		if (request == null) throw new ServiceException("找单请求不存在");
 		request.setFulfilled(null);
 		requestRepository.saveAndFlush(request);
-		eventBus.emit(domain, GlobalEventSpec.Action.CANCEL, true, request.getId());
+		eventBus.emitAfterCommit(domain, GlobalEventSpec.Action.CANCEL, true, request.getId());
 		return true;
 	}
 

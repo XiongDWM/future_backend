@@ -22,5 +22,7 @@ public interface UserService {
     public  boolean updateUser(User user);
     public boolean logout(long userId);
     public boolean autoLogout(long userId);
+    public boolean settleIncome(Long userId);
+    public boolean deleteUser(Long userId); // soft delete
 }
     

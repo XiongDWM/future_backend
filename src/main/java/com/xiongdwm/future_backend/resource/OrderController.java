@@ -20,6 +20,7 @@ import com.xiongdwm.future_backend.entity.Order;
 import com.xiongdwm.future_backend.service.FindingRequestService;
 import com.xiongdwm.future_backend.service.OrderSectionService;
 import com.xiongdwm.future_backend.service.OrderService;
+import com.xiongdwm.future_backend.service.ThirdPartyListingService;
 import com.xiongdwm.future_backend.utils.JacksonUtil;
 import com.xiongdwm.future_backend.utils.security.JwtTokenProvider;
 
@@ -37,13 +38,16 @@ public class OrderController {
     private final OrderService orderService;
     private final FindingRequestService findingRequestService;
     private final OrderSectionService orderSectionService;
+    private final ThirdPartyListingService thirdPartyListingService;
     private final JwtTokenProvider tokenProvider;
 
     public OrderController(OrderService orderService, FindingRequestService findingRequestService,
-                           OrderSectionService orderSectionService, JwtTokenProvider tokenProvider) {
+                           OrderSectionService orderSectionService, ThirdPartyListingService thirdPartyListingService,
+                           JwtTokenProvider tokenProvider) {
         this.orderService = orderService;
         this.findingRequestService = findingRequestService;
         this.orderSectionService = orderSectionService;
+        this.thirdPartyListingService = thirdPartyListingService;
         this.tokenProvider = tokenProvider;
     }
 
@@ -143,10 +147,11 @@ public class OrderController {
             var findingRequest = new FindingRequest();
             // 从token获取用户信息，关联打手
             var user = tokenProvider.getUserFromRawToken(token);
+            var studioId=tokenProvider.getStudioIdFromRawToken(token);
             findingRequest.setPalworld(user); // 后端关联打手
             findingRequest.setDescription(param.getGameType()+"|"+param.getRank()); // 描述里存游戏类型和段位，方便查询
             findingRequest.setMan(param.isMan());
-            var success = findingRequestService.submit(findingRequest);
+            var success = findingRequestService.submit(findingRequest, studioId);
             return success ? ApiResponse.success("提交成功") : ApiResponse.<String>error("提交失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -172,8 +177,12 @@ public class OrderController {
     @PostMapping("/order/close")
     public Mono<ApiResponse<String>> closeOrder(@RequestBody OrderCloseDto dto) {
         return Mono.fromCallable(() -> {
-            var success = orderService.closeOrder(dto);
-            return success ? ApiResponse.success("订单已完成") : ApiResponse.<String>error("订单关闭失败");
+            var order = orderService.closeOrder(dto);
+            // 平台二手单：同步完成截图到挂单和申请
+            if (order.isPlatformSecondHand() && order.getPicEnd() != null) {
+                thirdPartyListingService.syncPicEnd(order.getOrderId(), order.getPicEnd());
+            }
+            return ApiResponse.success("订单已完成");
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -181,11 +190,12 @@ public class OrderController {
     @PostMapping("/order/work")
     public Mono<ApiResponse<String>> workOrder(@RequestBody WorkWorkParam body) {
         return Mono.fromCallable(() -> {
-            long palId = body.getPalId();
-            String orderId = body.getOrderId();
-            String picStart = body.getPicStart();
-            var success = orderService.workWork(palId, orderId, picStart);
-            return success ? ApiResponse.success("接单成功") : ApiResponse.<String>error("接单失败");
+            var order = orderService.workWork(body.getPalId(), body.getOrderId(), body.getPicStart());
+            // 平台二手单：同步开工截图到挂单和申请
+            if (order.isPlatformSecondHand() && order.getPicStart() != null) {
+                thirdPartyListingService.syncPicStart(order.getOrderId(), order.getPicStart());
+            }
+            return ApiResponse.success("接单成功");
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -200,8 +210,12 @@ public class OrderController {
                     body.getOrDefault("unitType", "HOUR"));
             String additionalPic = body.get("additionalPic");
             String continuePic = body.get("continuePic");
-            var success = orderService.continueOrder(orderId, price, amount, unitType, additionalPic, continuePic);
-            return success ? ApiResponse.success("续单成功") : ApiResponse.<String>error("续单失败");
+            var order = orderService.continueOrder(orderId, price, amount, unitType, additionalPic, continuePic);
+            // 平台二手单：续单时picEnd已由service写入order
+            if (order.isPlatformSecondHand() && order.getPicEnd() != null) {
+                thirdPartyListingService.syncPicEnd(order.getOrderId(), order.getPicEnd());
+            }
+            return ApiResponse.success("续单成功");
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -211,8 +225,17 @@ public class OrderController {
         return Mono.fromCallable(() -> {
             String orderId = body.get("orderId");
             Long palId = Long.valueOf(body.get("palId"));
-            var subOrder = orderService.addCollaborator(orderId, palId);
+            var subOrder = orderService.addCollaborator(orderId, palId,-1d);
             return subOrder != null ? ApiResponse.success(subOrder.getOrderId()) : ApiResponse.<String>error("添加协作失败");
         }).subscribeOn(Schedulers.boundedElastic());
     }
+    @PostMapping("/order/delete")
+    public Mono<ApiResponse<String>> deleteOrder(@RequestBody Map<String, String> body) {
+        return Mono.fromCallable(() -> {
+            String orderId = body.get("orderId");
+            var success = orderService.deleteOrder(orderId);
+            return success ? ApiResponse.success("订单已删除") : ApiResponse.<String>error("订单删除失败");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+    
 }

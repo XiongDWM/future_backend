@@ -74,6 +74,14 @@ public class Order {
     private String gameType; // 订单相关的游戏类型，由前端传入，后端不做解析, 条件查询用
     @Column
     private String rankInfo;  // 订单相关的游戏段位等信息，纯文本，由前端传入，后端不做解析, 条件查询用
+    @Column(name = "from_bookorder")
+    private Long fromBookOrder; // 如果是从预约单生成的订单，这里记录预约单的id
+
+    @Column
+    private boolean platformSecondHand; // 是否来自平台甩单大厅的二手单，默认false
+
+    @Column
+    private Long thirdPartyApplicationId; // 关联平台甩单申请ID（用于图片同步）
 
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -307,11 +315,27 @@ public class Order {
     public void setRankInfo(String rankInfo) {
         this.rankInfo = rankInfo;
     }
-        
+    public Long getFromBookOrder() {
+        return fromBookOrder;
+    }
+    public void setFromBookOrder(Long fromBookOrder) {
+        this.fromBookOrder = fromBookOrder;
+    }
+    public boolean isPlatformSecondHand() {
+        return platformSecondHand;
+    }
+    public void setPlatformSecondHand(boolean platformSecondHand) {
+        this.platformSecondHand = platformSecondHand;
+    }
+    public Long getThirdPartyApplicationId() {
+        return thirdPartyApplicationId;
+    }
+    public void setThirdPartyApplicationId(Long thirdPartyApplicationId) {
+        this.thirdPartyApplicationId = thirdPartyApplicationId;
+    }
     @Override
     public String toString() {
         return "Order [orderId=" + orderId + ", issueDate=" + issueDate + ", status=" + status + ", lowIncome="
                 + lowIncome + ", amount=" + amount + ", secondHandStatus=" + secondHandStatus + "]";
     }
-    
 }

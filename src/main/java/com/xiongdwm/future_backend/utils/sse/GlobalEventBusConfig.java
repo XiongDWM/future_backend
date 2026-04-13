@@ -28,7 +28,7 @@ public class GlobalEventBusConfig {
                 .map(events -> {
                     var merged = new LinkedHashMap<String, GlobalEventSpec>();
                     for (var e : events) {
-                        merged.put(e.domain() + ":" + e.resourceId(), e);
+                        merged.put(e.studioId() + ":" + e.domain() + ":" + e.resourceId(), e);
                     }
                     return merged.values();
                 })

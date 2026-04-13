@@ -30,7 +30,7 @@ public class BookOrder {
     @Column
     private double amount; // 存单数量
     @Column
-    private double price; // 存单单价价格
+    private double price; // 存单 单价格
     @Column
     private String picProvence; // 订单相关的图片证明来源，纯文本（oss上传获取的文件ID），由前端传入，后端不做解析
     @Column
@@ -38,15 +38,15 @@ public class BookOrder {
     @Column
     private double remaining=0d; // 剩余数量，初始值等于amount，订单完成后会变成0，订单部分完成会小于amount但大于0
     @Column
-    private Boolean confirmed=false; // 是否确认（客服或管理确认后才会结算), null:未确认，true:确认，false:拒绝
+    private Boolean confirmed; // 是否确认（客服或管理确认后才会结算), null:未确认，true:确认，false:拒绝
     @Column 
     private String rejectReason="N/A"; // 拒绝理由，仅当confirmed=false时有值 需要客服或管理人员填写，比如图片对不上转账等
     @Column
-    private Long lastRechargeTime; // 上次充值时间，单位毫秒
+    private Long lastRechargeTime=0L; // 上次充值时间，单位毫秒
     @Column
-    private Long lastSettleTime; // 上次结算时间，单位毫秒
+    private Long lastSettleTime=0L; // 上次结算时间，单位毫秒
     @Column
-    private Double lastRechargeValue; // 上次充值数量
+    private Double lastRechargeValue=0d; // 上次充值数量
     
     
     @ManyToOne(fetch = FetchType.LAZY)

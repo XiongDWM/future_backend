@@ -78,14 +78,21 @@ public class BookOrderServiceImpl implements BookOrderService {
             throw new RuntimeException("请先存单");
         }
         var order=new Order();
+        var picString=bookOrder.getPicProvence();
+        var picArray=picString==null?null:picString.split(",");
+        var bookOrderPic=null==picArray?null:picArray[picArray.length - 1]; // 取最后一张图片作为订单图片
         order.setCustomer(bookOrder.getCustomer());
         order.setIssueDate(new Date());
         order.setGameType("N/A");
-        order.setAmount(bookOrder.getRemaining());
+        order.setAmount(1);
         order.setLowIncome(0d);
         order.setRankInfo("N/A");
+        order.setPicStart(bookOrderPic);
         order.setStatus(Order.Status.PENDING);
         order.setType(Order.Type.BOOKED);
+        order.setUnitType(Order.UnitType.HOUR);
+        order.setUserId(bookOrder.getPid());
+        order.setFromBookOrder(bookOrder.getId());
         order.setPalworld(bookOrder.getPalworld());
         orderService.createOrder(order);
         orderService.workWork(bookOrder.getPid(), order.getOrderId(),null);
@@ -101,11 +108,16 @@ public class BookOrderServiceImpl implements BookOrderService {
     }
 
     @Override
-    public boolean confirmBookOrder(Long orderId) {
-        var bookOrder = bookOrderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("存单不存在"));
-        bookOrder.setConfirmed(true);
+    public boolean auditBookOrder(Long id, Boolean confirm, String rejectReason) {
+        var bookOrder = bookOrderRepository.findById(id).orElseThrow(() -> new RuntimeException("存单不存在"));
+        bookOrder.setConfirmed(confirm);
+        if (Boolean.FALSE.equals(confirm)) {
+            bookOrder.setRejectReason(rejectReason);
+        }else {
+            bookOrder.setRejectReason("N/A");
+        }
         bookOrderRepository.saveAndFlush(bookOrder);
-        var action=GlobalEventSpec.Action.UPDATE;
+        var action = GlobalEventSpec.Action.UPDATE;
         eventBus.emit(domain, action, action.isFetchable(), bookOrder.getId());
         return true;
     }
@@ -123,14 +135,4 @@ public class BookOrderServiceImpl implements BookOrderService {
         return true;
     }
 
-    @Override
-    public boolean rejectBookOrder(Long orderId, String rejectReason) {
-        var bookOrder = bookOrderRepository.findById(orderId).orElseThrow(() -> new RuntimeException("存单不存在"));
-        bookOrder.setConfirmed(false);
-        bookOrder.setRejectReason(rejectReason);
-        bookOrderRepository.saveAndFlush(bookOrder);
-        var action=GlobalEventSpec.Action.UPDATE;
-        eventBus.emit(domain, action, action.isFetchable(), bookOrder.getId());
-        return true;
-    }
 }

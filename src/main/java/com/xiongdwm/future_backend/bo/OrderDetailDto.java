@@ -26,6 +26,9 @@ public class OrderDetailDto {
     private Order.UnitType unitType;
     private Order.SecondHandStatus secondHandStatus;
     private String additionalPic;
+    private boolean platformSecondHand;
+    private String gameType;
+    private String rankInfo;
 
     // 打手信息（精简）
     private Long palworldId;
@@ -60,6 +63,9 @@ public class OrderDetailDto {
         dto.unitType = order.getUnitType();
         dto.secondHandStatus = order.getSecondHandStatus();
         dto.additionalPic = order.getAdditionalPic();
+        dto.platformSecondHand = order.isPlatformSecondHand();
+        dto.gameType = order.getGameType();
+        dto.rankInfo = order.getRankInfo();
         if (order.getPalworld() != null) {
             dto.palworldId = order.getPalworld().getId();
             dto.palworldUsername = order.getPalworld().getUsername();
@@ -148,6 +154,9 @@ public class OrderDetailDto {
     public Order.UnitType getUnitType() { return unitType; }
     public Order.SecondHandStatus getSecondHandStatus() { return secondHandStatus; }
     public String getAdditionalPic() { return additionalPic; }
+    public boolean isPlatformSecondHand() { return platformSecondHand; }
+    public String getGameType() { return gameType; }
+    public String getRankInfo() { return rankInfo; }
     public Long getPalworldId() { return palworldId; }
     public String getPalworldUsername() { return palworldUsername; }
     public List<SubOrderDto> getSubOrders() { return subOrders; }

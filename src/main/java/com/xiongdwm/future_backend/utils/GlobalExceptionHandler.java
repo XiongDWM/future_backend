@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationFailException.class)
     public ApiResponse<String> handleUnAuthorizedException(AuthenticationFailException e) {
         logger.error("Unauthorized Exception: {}", e.getLocalizedMessage());
-        return ApiResponse.unauthorized();
+        return ApiResponse.unauthorized(e.getLocalizedMessage());
     }
     
 }

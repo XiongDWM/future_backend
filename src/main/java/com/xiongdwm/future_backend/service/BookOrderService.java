@@ -12,9 +12,8 @@ public interface BookOrderService {
     Page<BookOrder> listBookOrders(int page, int size, String customer, String customerId, Long pid);
     void startBookOrder(Long orderId);
     void updateBookOrder(BookOrderParam param);
-    boolean confirmBookOrder(Long orderId);
+    boolean auditBookOrder(Long id, Boolean confirm, String rejectReason);
     boolean rechargeBookOrder(Long orderId, int amount, double price);
-    boolean rejectBookOrder(Long orderId, String rejectReason);
 
 
 }
