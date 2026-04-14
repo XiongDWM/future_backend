@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .pathMatchers("/user/login").permitAll()
                         .pathMatchers("/user/pal/login").permitAll()
                         .pathMatchers("/studio/register").permitAll()
+                        .pathMatchers("/platform/login").permitAll()
                         .pathMatchers("/events/stream").permitAll()
                         .pathMatchers("/oss/preview/**").permitAll()
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
@@ -80,6 +81,7 @@ public class SecurityConfig {
                     || "/user/login".equals(path)
                     || "/user/pal/login".equals(path)
                     || "/studio/register".equals(path)
+                    || "/platform/login".equals(path)
                     || "/events/stream".equals(path)
                     || path.startsWith("/oss/preview/")) {
                 return chain.filter(exchange);
@@ -104,6 +106,23 @@ public class SecurityConfig {
             if (jwtTokenProvider.shouldRenew(claims)) {
                 String newToken = jwtTokenProvider.renewToken(claims);
                 exchange.getResponse().getHeaders().set("X-New-Token", newToken);
+            }
+
+            boolean isPlatformToken = jwtTokenProvider.isPlatformToken(claims);
+
+            // /platform/** 路径只允许平台 token 访问
+            if (path.startsWith("/platform/") && !isPlatformToken) {
+                return chain.filter(exchange);
+            }
+            // 非平台路径不允许平台 token 访问
+            if (!path.startsWith("/platform/") && isPlatformToken) {
+                return chain.filter(exchange);
+            }
+
+            // 平台 token 不需要租户路由
+            if (isPlatformToken) {
+                return chain.filter(exchange)
+                        .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
             }
 
             try { activityTracker.touch(Long.parseLong(userId)); } catch (NumberFormatException ignored) {}

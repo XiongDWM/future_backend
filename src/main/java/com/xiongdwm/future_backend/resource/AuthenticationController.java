@@ -51,7 +51,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/user/login")
-    public Mono<ApiResponse<String>> login(@RequestBody Map<String, String> body) {
+    public Mono<ApiResponse<Map<String, String>>> login(@RequestBody Map<String, String> body) {
         String username = body.get("username").trim();
         String password = body.get("password");
         return Mono.fromCallable(() -> {
@@ -75,7 +75,12 @@ public class AuthenticationController {
                 var user = authenticationService.authenticate(username, password);
                 String token = jwtTokenProvider.generateToken(
                         user.getId(), user.getUsername(), user.getRole().name(), studioId);
-                return ApiResponse.success(token);
+                String studioName = studio != null ? studio.getName() : "";
+                return ApiResponse.success(Map.of(
+                        "token", token,
+                        "studioName", studioName,
+                        "studioId", String.valueOf(studioId)
+                ));
             } finally {
                 TenantContext.clear();
             }

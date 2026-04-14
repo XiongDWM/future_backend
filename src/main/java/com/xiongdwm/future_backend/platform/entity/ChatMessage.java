@@ -31,7 +31,10 @@ public class ChatMessage {
     private String senderName;    // 发送者显示名
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    private String content;       // 消息内容
+    private String content;       // 消息内容（IMAGE 类型时为逗号分隔的文件ID）
+
+    @Column(nullable = false, length = 10)
+    private String messageType = "TEXT"; // TEXT / IMAGE
 
     @Column(nullable = false)
     private Date sentAt;          // 发送时间
@@ -55,6 +58,9 @@ public class ChatMessage {
 
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
+
+    public String getMessageType() { return messageType; }
+    public void setMessageType(String messageType) { this.messageType = messageType; }
 
     public Date getSentAt() { return sentAt; }
     public void setSentAt(Date sentAt) { this.sentAt = sentAt; }

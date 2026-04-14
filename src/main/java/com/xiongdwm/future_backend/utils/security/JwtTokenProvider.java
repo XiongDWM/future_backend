@@ -69,6 +69,29 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public String generatePlatformToken(Long platformUserId, String username, String platformRole) {
+        if (devMode) {
+            return "DEV_TOKEN";
+        }
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + expirationMs);
+        return Jwts.builder()
+                .subject(String.valueOf(platformUserId))
+                .claim("username", username)
+                .claim("role", platformRole)
+                .claim("platform", true)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(key)
+                .compact();
+    }
+
+    public boolean isPlatformToken(Claims claims) {
+        if (claims == null) return false;
+        Boolean platform = claims.get("platform", Boolean.class);
+        return Boolean.TRUE.equals(platform);
+    }
+
     // 解析 token，返回 Claims；token 无效或过期则返回 null
     public Claims parseToken(String token) {
         if (devMode) {
@@ -184,6 +207,9 @@ public class JwtTokenProvider {
         String userId = claims.getSubject();
         String username = claims.get("username", String.class);
         String role = claims.get("role", String.class);
+        if (isPlatformToken(claims)) {
+            return generatePlatformToken(Long.parseLong(userId), username, role);
+        }
         Long studioId = claims.get("studioId", Long.class);
         return generateToken(Long.parseLong(userId), username, role, studioId);
     }

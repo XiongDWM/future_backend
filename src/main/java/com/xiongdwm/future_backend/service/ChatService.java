@@ -9,7 +9,7 @@ import com.xiongdwm.future_backend.platform.entity.ChatMessage;
 public interface ChatService {
 
     /** 发送消息，返回持久化后的消息实体 */
-    ChatMessage send(Long applicationId, Long senderStudioId, String senderName, String content);
+    ChatMessage send(Long applicationId, Long senderStudioId, String senderName, String content, String messageType);
 
     /** 获取某对话的全部消息，同时将对方发来的标记已读 */
     List<ChatMessage> getMessages(Long applicationId, Long myStudioId);

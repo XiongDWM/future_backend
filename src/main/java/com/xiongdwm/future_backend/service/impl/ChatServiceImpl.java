@@ -43,7 +43,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional("platformTransactionManager")
-    public ChatMessage send(Long applicationId, Long senderStudioId, String senderName, String content) {
+    public ChatMessage send(Long applicationId, Long senderStudioId, String senderName, String content, String messageType) {
         var app = appRepo.findById(applicationId)
                 .orElseThrow(() -> new ServiceException("申请记录不存在"));
 
@@ -65,6 +65,7 @@ public class ChatServiceImpl implements ChatService {
         msg.setSenderStudioId(senderStudioId);
         msg.setSenderName(senderName);
         msg.setContent(content);
+        msg.setMessageType(messageType != null ? messageType : "TEXT");
         msg.setSentAt(new Date());
         msg.setReadByReceiver(false);
         chatRepo.saveAndFlush(msg);

@@ -46,8 +46,9 @@ public class ChatController {
         String username = tokenProvider.getUsernameFromRawToken(token);
         Long applicationId = ((Number) body.get("applicationId")).longValue();
         String content = (String) body.get("content");
+        String messageType = (String) body.getOrDefault("messageType", "TEXT");
         return Mono.fromCallable(() -> {
-            var msg = chatService.send(applicationId, studioId, username, content);
+            var msg = chatService.send(applicationId, studioId, username, content, messageType);
             return ApiResponse.success(msg);
         }).subscribeOn(Schedulers.boundedElastic());
     }

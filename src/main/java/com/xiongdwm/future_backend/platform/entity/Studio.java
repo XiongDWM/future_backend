@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -34,6 +35,12 @@ public class Studio {
     @Column
     private Date willChargeAt;
 
+    @Column
+    private double chargeAmount; // 充值金额，单位元
+
+    @ManyToOne
+    private PlatformUser platformUser;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getDbName() { return dbName; }
@@ -48,4 +55,6 @@ public class Studio {
     public void setLastChargeAt(Date lastChargeAt) { this.lastChargeAt = lastChargeAt; }
     public Date getWillChargeAt() { return willChargeAt; }
     public void setWillChargeAt(Date willChargeAt) { this.willChargeAt = willChargeAt; }
+    public double getChargeAmount() { return chargeAmount; }
+    public void setChargeAmount(double chargeAmount) { this.chargeAmount = chargeAmount; }
 }
