@@ -37,10 +37,12 @@ public class BookOrderController {
      * @return 是否成功
      */
     @PostMapping("/bookOrder/create")
-    public ApiResponse<String> createBookOrder(@RequestBody BookOrderParam booking,@RequestHeader("Authorization") String token) {
+    public Mono<ApiResponse<String>> createBookOrder(@RequestBody BookOrderParam booking,@RequestHeader("Authorization") String token) {
         var user=tokenProvider.getUserFromRawToken(token);
-        boolean success = bookOrderService.createBookOrder(booking, user);
-        return success ? ApiResponse.success("存单成功") : ApiResponse.error("存单失败");
+        return Mono.fromCallable(() -> {
+            boolean success = bookOrderService.createBookOrder(booking, user);
+            return success ? ApiResponse.success("存单成功") : ApiResponse.<String>error("存单失败");
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     /**
@@ -69,30 +71,36 @@ public class BookOrderController {
 
     /**
      * 从存单创建order
-     * @param orderId 订单ID
-     * @param token 用户token
-     * @return 是否成功
      */
     @PostMapping("/bookOrder/starting")
-    public ApiResponse<String> startBookOrder(@RequestBody Map<String,Long> body) {
-        var orderId = body.get("orderId");
-        bookOrderService.startBookOrder(orderId);
-        return ApiResponse.success("接单成功");
+    public Mono<ApiResponse<String>> startBookOrder(@RequestBody Map<String,Long> body) {
+        return Mono.fromCallable(() -> {
+            var orderId = body.get("orderId");
+            bookOrderService.startBookOrder(orderId);
+            return ApiResponse.success("接单成功");
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/bookOrder/audit")
-    public ApiResponse<String> auditBookOrder(@RequestBody Map<String, Object> body) {
-        Long id = Long.valueOf(body.get("id").toString());
-        Boolean confirm = (Boolean) body.get("confirm");
-        String rejectReason = body.containsKey("rejectReason") ? (String) body.get("rejectReason") : "";
-        boolean success = bookOrderService.auditBookOrder(id, confirm, rejectReason);
-        return success ? ApiResponse.success("操作成功") : ApiResponse.error("操作失败");
+    public Mono<ApiResponse<String>> auditBookOrder(@RequestBody Map<String, Object> body) {
+        return Mono.fromCallable(() -> {
+            Long id = Long.valueOf(body.get("id").toString());
+            Boolean confirm = (Boolean) body.get("confirm");
+            String rejectReason = body.containsKey("rejectReason") ? (String) body.get("rejectReason") : "";
+            boolean success = bookOrderService.auditBookOrder(id, confirm, rejectReason);
+            return success ? ApiResponse.success("操作成功") : ApiResponse.<String>error("操作失败");
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/bookOrder/recharge")
-    public ApiResponse<String> rechargeBookOrder(@RequestBody Long orderId,int amount,double price) {
-        boolean success = bookOrderService.rechargeBookOrder(orderId,amount,price);
-        return success ? ApiResponse.success("充值成功") : ApiResponse.error("充值失败");
+    public Mono<ApiResponse<String>> rechargeBookOrder(@RequestBody Map<String, Object> body) {
+         Long orderId = Long.valueOf(body.get("orderId").toString());
+         Integer amount = Integer.valueOf(body.get("amount").toString());
+         Double price = Double.valueOf(body.get("price").toString());
+        return Mono.fromCallable(() -> {
+            boolean success = bookOrderService.rechargeBookOrder(orderId, amount, price);
+            return success ? ApiResponse.success("充值成功") : ApiResponse.<String>error("充值失败");
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
 }
