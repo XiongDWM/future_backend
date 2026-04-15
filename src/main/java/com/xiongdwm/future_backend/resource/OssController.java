@@ -1,6 +1,5 @@
 package com.xiongdwm.future_backend.resource;
 
-import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,7 +9,6 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
@@ -29,6 +27,7 @@ import com.xiongdwm.future_backend.utils.exception.ServiceException;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequestMapping("/oss")
@@ -51,42 +50,44 @@ public class OssController {
     @GetMapping("/download/{fileId}")
     public Flux<DataBuffer> download(@PathVariable("fileId") String fileId,
                                      org.springframework.http.server.reactive.ServerHttpResponse response) {
-        String filename = fileLogService.getDownloadFilename(fileId);
-        response.getHeaders().set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
-        response.getHeaders().setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        return fileLogService.download(fileId);
+        return fileLogService.getDownloadFilename(fileId).flatMapMany(filename -> {
+            response.getHeaders().set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+            response.getHeaders().setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            return fileLogService.download(fileId);
+        }).switchIfEmpty(Mono.error(new ServiceException("文件不存在")));
     }
 
     @GetMapping("/preview/{fileId}")
     public Flux<DataBuffer> preview(@PathVariable("fileId") String fileId,
                                     org.springframework.http.server.reactive.ServerHttpResponse response) {
         // preview 是 permitAll，没有租户上下文，直接从磁盘按 UUID 查找文件
-        Path dirPath = Paths.get(uploadDir);
-        Path filePath = null;
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dirPath, fileId + "*")) {
-            for (Path p : stream) {
-                filePath = p;
-                break;
+        return Mono.fromCallable(() -> {
+            Path dirPath = Paths.get(uploadDir);
+            Path found = null;
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dirPath, fileId + "*")) {
+                for (Path p : stream) {
+                    found = p;
+                    break;
+                }
             }
-        } catch (IOException e) {
-            throw new ServiceException("读取文件失败");
-        }
-        if (filePath == null) throw new ServiceException("文件不存在");
-
-        String filename = filePath.getFileName().toString();
-        String subfix = filename.contains(".") ? filename.substring(filename.lastIndexOf(".")) : "";
-        MediaType mediaType = switch (subfix.toLowerCase()) {
-            case ".png"  -> MediaType.IMAGE_PNG;
-            case ".jpg", ".jpeg" -> MediaType.IMAGE_JPEG;
-            case ".gif"  -> MediaType.IMAGE_GIF;
-            case ".svg"  -> MediaType.valueOf("image/svg+xml");
-            case ".webp" -> MediaType.valueOf("image/webp");
-            case ".bmp"  -> MediaType.valueOf("image/bmp");
-            default      -> MediaType.APPLICATION_OCTET_STREAM;
-        };
-        response.getHeaders().setContentType(mediaType);
-        response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "max-age=86400");
-        return DataBufferUtils.read(filePath, new DefaultDataBufferFactory(), 4096);
+            if (found == null) throw new ServiceException("文件不存在");
+            return found;
+        }).subscribeOn(Schedulers.boundedElastic()).flatMapMany(filePath -> {
+            String filename = filePath.getFileName().toString();
+            String subfix = filename.contains(".") ? filename.substring(filename.lastIndexOf(".")) : "";
+            MediaType mediaType = switch (subfix.toLowerCase()) {
+                case ".png"  -> MediaType.IMAGE_PNG;
+                case ".jpg", ".jpeg" -> MediaType.IMAGE_JPEG;
+                case ".gif"  -> MediaType.IMAGE_GIF;
+                case ".svg"  -> MediaType.valueOf("image/svg+xml");
+                case ".webp" -> MediaType.valueOf("image/webp");
+                case ".bmp"  -> MediaType.valueOf("image/bmp");
+                default      -> MediaType.APPLICATION_OCTET_STREAM;
+            };
+            response.getHeaders().setContentType(mediaType);
+            response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "max-age=86400");
+            return DataBufferUtils.read(filePath, response.bufferFactory(), 4096);
+        });
     }
 
     @DeleteMapping("/delete/{fileId}")
@@ -96,7 +97,8 @@ public class OssController {
     }
 
     @GetMapping("/list")
-    public ApiResponse<List<FileLog>> list() {
-        return ApiResponse.success(fileLogService.listFiles());
+    public Mono<ApiResponse<List<FileLog>>> list() {
+        return fileLogService.listFiles()
+                .map(ApiResponse::success);
     }
 }

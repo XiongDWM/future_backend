@@ -23,6 +23,8 @@ import com.xiongdwm.future_backend.utils.exception.ServiceException;
 import org.springframework.http.codec.multipart.FilePart;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 public class FileLogServiceImpl implements FileLogService {
@@ -64,23 +66,29 @@ public class FileLogServiceImpl implements FileLogService {
                     fileLog.setUrl(storedFilename);
                     fileLog.setUploadAt(new Date());
                     return fileLogRepository.saveAndFlush(fileLog);
-                }));
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     @Override
     public Flux<DataBuffer> download(String fileId) {
-        var fileLog = fileLogRepository.findById(fileId).orElse(null);
-        if (fileLog == null) throw new ServiceException("文件不存在");
-        Path filePath = Paths.get(uploadDir).resolve(fileLog.getUrl());
-        if (!Files.exists(filePath)) throw new ServiceException("文件不存在于磁盘");
-        return DataBufferUtils.read(filePath, new DefaultDataBufferFactory(), 4096);
+        return Mono.fromCallable(() -> {
+            var fileLog = fileLogRepository.findById(fileId).orElse(null);
+            if (fileLog == null) throw new ServiceException("文件不存在");
+            Path filePath = Paths.get(uploadDir).resolve(fileLog.getUrl());
+            if (!Files.exists(filePath)) throw new ServiceException("文件不存在于磁盘");
+            return filePath;
+        }).subscribeOn(Schedulers.boundedElastic()).flatMapMany(filePath ->
+            DataBufferUtils.read(filePath, new DefaultDataBufferFactory(), 4096)
+        );
     }
 
     @Override
-    public String getDownloadFilename(String fileId) {
-        var fileLog = fileLogRepository.findById(fileId).orElse(null);
-        if (fileLog == null) throw new ServiceException("文件不存在");
-        return fileLog.getFilename();
+    public Mono<String> getDownloadFilename(String fileId) {
+        return Mono.fromCallable(() ->{
+            var fileLog = fileLogRepository.findById(fileId).orElse(null);
+            if (fileLog == null) throw new ServiceException("文件不存在");
+            return fileLog.getFilename();
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     @Override
@@ -103,11 +111,12 @@ public class FileLogServiceImpl implements FileLogService {
             }
             fileLogRepository.delete(fileLog);
             return true;
-        });
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     @Override
-    public List<FileLog> listFiles() {
-        return fileLogRepository.findAll();
+    public Mono<List<FileLog>> listFiles() {
+        return Mono.fromCallable(() -> fileLogRepository.findAll())
+                .subscribeOn(Schedulers.boundedElastic());
     }
 }

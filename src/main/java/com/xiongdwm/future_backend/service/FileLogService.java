@@ -13,8 +13,8 @@ import reactor.core.publisher.Mono;
 public interface FileLogService {
     public Mono<FileLog> upload(FilePart filePart);
     public Flux<DataBuffer> download(String fileId);
-    public String getDownloadFilename(String fileId);
+    public Mono<String> getDownloadFilename(String fileId);
     public String getFileSubfix(String fileId);
     public Mono<Boolean> delete(String fileId);
-    public List<FileLog> listFiles();
+    public Mono<List<FileLog>> listFiles();
 }
