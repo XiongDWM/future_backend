@@ -26,4 +26,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     /** 查询我参与的所有对话中，每个对话的未读数 — 返回 [applicationId, count] */
     @Query("SELECT m.applicationId, COUNT(m) FROM ChatMessage m WHERE m.senderStudioId <> :myStudioId AND m.readByReceiver = false GROUP BY m.applicationId")
     List<Object[]> countAllUnread(@Param("myStudioId") Long myStudioId);
+
+    /** 查询某对话最后一条消息的发送时间 */
+    @Query("SELECT MAX(m.sentAt) FROM ChatMessage m WHERE m.applicationId = :appId")
+    java.util.Date findLastMessageTime(@Param("appId") Long applicationId);
 }

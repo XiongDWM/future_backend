@@ -33,7 +33,7 @@ public class AuthenticationController {
     private final TenantRoutingDataSource tenantRoutingDataSource;
     private final StudioRepository studioRepository;
     private final CacheHandler cacheHandler;
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthenticationController.class);
+    // private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthenticationController.class);
 
     public AuthenticationController(UserService authenticationService, JwtTokenProvider jwtTokenProvider,
                                     UserActivityTracker activityTracker,

@@ -111,16 +111,19 @@ public class ChatServiceImpl implements ChatService {
         var result = new ArrayList<ConversationSummaryDto>();
         for (var app : myApps) {
             if (!seen.add(app.getId())) continue;
-            if (chatRepo.findByApplicationIdOrderBySentAtAsc(app.getId()).isEmpty()) continue;
+            var lastMsgTime = chatRepo.findLastMessageTime(app.getId());
+            if (lastMsgTime == null) continue;
             var listing = listingRepo.findById(app.getListingId()).orElse(null);
             result.add(new ConversationSummaryDto(
                 app.getId(),
                 listing != null ? listing.getGameType() : null,
                 listing != null && listing.getOrderType() != null ? listing.getOrderType().name() : null,
                 listing != null ? listing.getStudioName() : "未知",
-                app.getStudioName()
+                app.getStudioName(),
+                lastMsgTime
             ));
         }
+        result.sort((a, b) -> b.lastMessageAt().compareTo(a.lastMessageAt()));
         return result;
     }
 }
