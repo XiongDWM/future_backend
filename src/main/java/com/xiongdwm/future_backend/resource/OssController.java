@@ -1,5 +1,6 @@
 package com.xiongdwm.future_backend.resource;
 
+import java.net.URLEncoder;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +13,7 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,18 +50,19 @@ public class OssController {
     }
 
     @GetMapping("/download/{fileId}")
-    public Flux<DataBuffer> download(@PathVariable("fileId") String fileId,
-                                     org.springframework.http.server.reactive.ServerHttpResponse response) {
+    public Flux<DataBuffer> download(@PathVariable("fileId") String fileId, ServerHttpResponse response) {
         return fileLogService.getDownloadFilename(fileId).flatMapMany(filename -> {
-            response.getHeaders().set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+            String encoded = URLEncoder.encode(filename, java.nio.charset.StandardCharsets.UTF_8)
+                    .replace("+", "%20");
+            response.getHeaders().set(HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" + encoded + "\"; filename*=UTF-8''" + encoded);
             response.getHeaders().setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            return fileLogService.download(fileId);
+            return fileLogService.download(fileId, response);
         }).switchIfEmpty(Mono.error(new ServiceException("文件不存在")));
     }
 
     @GetMapping("/preview/{fileId}")
-    public Flux<DataBuffer> preview(@PathVariable("fileId") String fileId,
-                                    org.springframework.http.server.reactive.ServerHttpResponse response) {
+    public Flux<DataBuffer> preview(@PathVariable("fileId") String fileId, ServerHttpResponse response) {
         // preview 是 permitAll，没有租户上下文，直接从磁盘按 UUID 查找文件
         return Mono.fromCallable(() -> {
             Path dirPath = Paths.get(uploadDir);

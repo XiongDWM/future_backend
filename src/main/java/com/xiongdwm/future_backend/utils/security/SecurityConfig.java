@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .pathMatchers("/platform/login").permitAll()
                         .pathMatchers("/events/stream").permitAll()
                         .pathMatchers("/oss/preview/**").permitAll()
+                        .pathMatchers("/oss/download/**").permitAll()
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .anyExchange().authenticated()
                 )
@@ -83,7 +84,8 @@ public class SecurityConfig {
                     || "/studio/register".equals(path)
                     || "/platform/login".equals(path)
                     || "/events/stream".equals(path)
-                    || path.startsWith("/oss/preview/")) {
+                    || path.startsWith("/oss/preview/")
+                    || path.startsWith("/oss/download/")) {
                 return chain.filter(exchange);
             }
 

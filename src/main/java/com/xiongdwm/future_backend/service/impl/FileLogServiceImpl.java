@@ -12,7 +12,6 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.stereotype.Service;
 
 import com.xiongdwm.future_backend.entity.FileLog;
@@ -21,6 +20,8 @@ import com.xiongdwm.future_backend.service.FileLogService;
 import com.xiongdwm.future_backend.utils.exception.ServiceException;
 
 import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -69,12 +70,12 @@ public class FileLogServiceImpl implements FileLogService {
     }
 
     @Override
-    public Flux<DataBuffer> download(String fileId) {
+    public Flux<DataBuffer> download(String fileId,ServerHttpResponse response) {
         var fileLog = fileLogRepository.findById(fileId).orElse(null);
         if (fileLog == null) throw new ServiceException("文件不存在");
         Path filePath = Paths.get(uploadDir).resolve(fileLog.getUrl());
         if (!Files.exists(filePath)) throw new ServiceException("文件不存在于磁盘");
-        return DataBufferUtils.read(filePath, new DefaultDataBufferFactory(), 4096);
+        return DataBufferUtils.read(filePath, response.bufferFactory(), 4096);
     }
 
     @Override

@@ -54,9 +54,10 @@ public class GlobalWebFilter implements WebFilter {
             "/crypto/handshake"
     );
 
-    /** 前缀匹配放行：如图片预览等无需加解密的路径 */
+    /** 前缀匹配放行：如图片预览、文件下载等无需加解密的路径 */
     private static final Set<String> FULLY_EXCLUDED_PREFIXES = Set.of(
-            "/oss/preview/"
+            "/oss/preview/",
+            "/oss/download/"
     );
 
     /** 仅校验 session + 签名，不做 body 加解密（SSE 等流式接口、文件上传） */
