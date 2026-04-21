@@ -51,10 +51,10 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
         config.setUsername(username);
         config.setPassword(password);
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        config.setMinimumIdle(2);
-        config.setMaximumPoolSize(10);
-        config.setIdleTimeout(30000);
-        config.setConnectionTimeout(10000);
+        config.setMinimumIdle(1);
+        config.setMaximumPoolSize(5);
+        config.setIdleTimeout(300000);
+        config.setConnectionTimeout(5000);
         config.setMaxLifetime(1800000);
         return new HikariDataSource(config);
     }

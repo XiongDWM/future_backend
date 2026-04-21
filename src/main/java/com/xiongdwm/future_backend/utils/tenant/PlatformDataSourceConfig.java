@@ -54,9 +54,9 @@ public class PlatformDataSourceConfig {
         config.setPassword(password);
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
         config.setMinimumIdle(2);
-        config.setMaximumPoolSize(5);
-        config.setIdleTimeout(30000);
-        config.setConnectionTimeout(10000);
+        config.setMaximumPoolSize(8);
+        config.setIdleTimeout(300000);
+        config.setConnectionTimeout(5000);
         config.setMaxLifetime(1800000);
         return new HikariDataSource(config);
     }
